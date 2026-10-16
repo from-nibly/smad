@@ -2863,7 +2863,7 @@ dependencies = [
 
 [[package]]
 name = "smad"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "gtk4",
  "merman",
@@ -2878,7 +2878,7 @@ dependencies = [
 
 [[package]]
 name = "smad-cli"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -2890,7 +2890,7 @@ dependencies = [
 
 [[package]]
 name = "smad-control"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "libc",
  "smad-protocol",
@@ -2899,7 +2899,7 @@ dependencies = [
 
 [[package]]
 name = "smad-core"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "libc",
  "percent-encoding",
@@ -2911,7 +2911,7 @@ dependencies = [
 
 [[package]]
 name = "smad-protocol"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -2921,7 +2921,7 @@ dependencies = [
 
 [[package]]
 name = "smad-zellij"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "zellij-tile",
 ]

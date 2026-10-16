@@ -20,7 +20,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
             libgtk-4-dev libwebkitgtk-6.0-dev librsvg2-common \
-            pkg-config xvfb dbus python3
+            pkg-config xvfb dbus python3 apparmor
+
+      - name: Permit WebKit sandbox namespaces on the disposable runner
+        run: |
+          # Ubuntu 24.04 restricts unprivileged user namespaces. Grant the
+          # distro sandbox helper that capability; do not disable WebKit's sandbox.
+          sudo tee /etc/apparmor.d/smad-ci-bwrap >/dev/null <<'EOF'
+          abi <abi/4.0>,
+          include <tunables/global>
+          profile smad-ci-bwrap /usr/bin/bwrap flags=(unconfined) {
+            userns,
+          }
+          EOF
+          sudo apparmor_parser -r /etc/apparmor.d/smad-ci-bwrap
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
