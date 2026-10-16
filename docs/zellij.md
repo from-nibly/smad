@@ -14,15 +14,15 @@ It does not launch or raise the browser. A missing helper, missing browser, or i
 The source installer places the WASM at:
 
 ```text
-<PREFIX>/share/lavish-browser/zellij/lavish-browser-zellij.wasm
+<PREFIX>/share/smad/zellij/smad-zellij.wasm
 ```
 
-Copy and edit [`examples/zellij/lavish-browser.kdl`](../examples/zellij/lavish-browser.kdl), using absolute installed paths for both the WASM and `lavish-browser-ctl`:
+Copy and edit [`examples/zellij/smad.kdl`](../examples/zellij/smad.kdl), using absolute installed paths for both the WASM and `smad-ctl`:
 
 ```kdl
 load_plugins {
-    "file:/home/me/.local/share/lavish-browser/zellij/lavish-browser-zellij.wasm" {
-        helper_path "/home/me/.local/bin/lavish-browser-ctl"
+    "file:/home/me/.local/share/smad/zellij/smad-zellij.wasm" {
+        helper_path "/home/me/.local/bin/smad-ctl"
         debug "false"
     }
 }
@@ -30,4 +30,4 @@ load_plugins {
 
 On first load, approve exactly `ReadApplicationState` and `RunCommands`. `RunCommands` is required because Zellij WASM cannot open the Unix socket; the plugin invokes the native helper with direct argv. It does not request `WebAccess` and exposes no HTTP control endpoint.
 
-Use `debug "true"` only for bounded diagnostics. If synchronization is absent, confirm permissions, absolute paths, Zellij 0.44 compatibility, and `lavish-browser-ctl ping`. Normal `lavish-open` remains functional if the plugin is removed.
+Use `debug "true"` only for bounded diagnostics. If synchronization is absent, confirm permissions, absolute paths, Zellij 0.44 compatibility, and `smad-ctl ping`. Normal `lavish-open` remains functional if the plugin is removed.

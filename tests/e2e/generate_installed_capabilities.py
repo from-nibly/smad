@@ -87,7 +87,7 @@ def main():
     if blockers - {"excalidraw"}:
         raise SystemExit(f"automated compatibility blockers remain: {sorted(blockers)}")
 
-    expected_hash = artifacts["bin/lavish-browser"]["sha256"]
+    expected_hash = artifacts["bin/smad"]["sha256"]
     manual_hash, manual_path = manual_hash_line.split(maxsplit=1)
     actual_manual_hash = hashlib.sha256(Path(manual_path).read_bytes()).hexdigest()
     manual_ok = all([

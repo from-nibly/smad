@@ -1,4 +1,4 @@
-//! Optional one-way Zellij lifecycle integration for Lavish Browser.
+//! Optional one-way Zellij lifecycle integration for SMAD.
 
 use std::collections::BTreeSet;
 
@@ -136,7 +136,7 @@ mod plugin {
             self.helper_path = configuration
                 .get("helper_path")
                 .cloned()
-                .unwrap_or_else(|| "lavish-browser-ctl".to_owned());
+                .unwrap_or_else(|| "smad-ctl".to_owned());
             self.debug = configuration
                 .get("debug")
                 .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "yes"));
@@ -209,7 +209,7 @@ mod plugin {
         fn run_helper(&self, command: HelperCommand) {
             let argv = command.argv(&self.helper_path);
             if self.debug {
-                eprintln!("lavish-browser-zellij: {}", argv[1..].join(" "));
+                eprintln!("smad-zellij: {}", argv[1..].join(" "));
             }
             run_command(&[&argv[0], &argv[1], &argv[2], &argv[3]], BTreeMap::new());
         }

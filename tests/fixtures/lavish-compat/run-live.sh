@@ -30,7 +30,7 @@ trap cleanup EXIT INT TERM
 sleep 2
 
 DISPLAY=:99 python -u "$root/tests/fixtures/lavish-compat/run.py" \
-  --browser "$root/target/debug/lavish-browser" \
+  --browser "$root/target/debug/smad" \
   --launcher "$root/target/debug/lavish-open" \
   --evidence "$root/$evidence" \
   --port "$port" \

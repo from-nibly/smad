@@ -10,9 +10,12 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.3"
+version = "0.3.0"
 edition = "2024"
 publish = false
+
+[profile.release]
+strip = "symbols"
 
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }

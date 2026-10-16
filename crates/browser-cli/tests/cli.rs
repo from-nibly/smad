@@ -1,5 +1,5 @@
-use lavish_browser_control::SocketServer;
-use lavish_browser_protocol::{
+use smad_control::SocketServer;
+use smad_protocol::{
     Command, PROTOCOL_VERSION, ProjectKey, RequestEnvelope, ResponseEnvelope, ResponseStatus,
 };
 use std::fs;
@@ -70,7 +70,7 @@ fn launcher_forwards_bytes_preserves_args_and_routes_standalone() {
             ),
         )
         .env("ARGS_LOG", &args_log)
-        .env("LAVISH_BROWSER_SOCKET", &socket)
+        .env("SMAD_SOCKET", &socket)
         .env_remove("HERDR_ENV")
         .env_remove("HERDR_SESSION")
         .env_remove("HERDR_WORKSPACE_ID")
@@ -120,7 +120,7 @@ fn user_ended_and_upstream_failure_never_contact_or_start_browser() {
         let dir = temp_dir(name);
         let marker = dir.join("started");
         executable(
-            &dir.join("lavish-browser"),
+            &dir.join("smad"),
             &format!("#!/bin/sh\ntouch '{}'\n", marker.display()),
         );
         executable(
@@ -139,8 +139,8 @@ fn user_ended_and_upstream_failure_never_contact_or_start_browser() {
                     std::env::var("PATH").unwrap_or_default()
                 ),
             )
-            .env("LAVISH_BROWSER_EXECUTABLE", dir.join("lavish-browser"))
-            .env("LAVISH_BROWSER_SOCKET", dir.join("absent.sock"))
+            .env("SMAD_EXECUTABLE", dir.join("smad"))
+            .env("SMAD_SOCKET", dir.join("absent.sock"))
             .env_remove("HERDR_ENV")
             .env_remove("HERDR_SESSION")
             .env_remove("HERDR_WORKSPACE_ID")
@@ -165,7 +165,7 @@ fn launcher_starts_browser_and_waits_for_ping_before_opening() {
         "#!/bin/sh\nprintf 'session:\\n  file: /tmp/start.html\\n  url: http://localhost:4387/session/start\\n  status: opened\\n'\n",
     );
     let python = r#"import json,os,socket
-p=os.environ['LAVISH_BROWSER_SOCKET']
+p=os.environ['SMAD_SOCKET']
 try: os.unlink(p)
 except FileNotFoundError: pass
 s=socket.socket(socket.AF_UNIX); s.bind(p); os.chmod(p,0o600); s.listen()
@@ -192,8 +192,8 @@ for _ in range(2):
                 std::env::var("PATH").unwrap_or_default()
             ),
         )
-        .env("LAVISH_BROWSER_EXECUTABLE", dir.join("fake-browser"))
-        .env("LAVISH_BROWSER_SOCKET", &socket)
+        .env("SMAD_EXECUTABLE", dir.join("fake-browser"))
+        .env("SMAD_SOCKET", &socket)
         .env_remove("HERDR_ENV")
         .env_remove("HERDR_SESSION")
         .env_remove("HERDR_WORKSPACE_ID")
@@ -218,10 +218,10 @@ fn lifecycle_helper_is_quiet_when_absent_and_never_starts_browser() {
         &dir.join("browser"),
         &format!("#!/bin/sh\ntouch '{}'\n", marker.display()),
     );
-    let output = ProcessCommand::new(env!("CARGO_BIN_EXE_lavish-browser-ctl"))
+    let output = ProcessCommand::new(env!("CARGO_BIN_EXE_smad-ctl"))
         .args(["select-project", "main", "7"])
-        .env("LAVISH_BROWSER_SOCKET", dir.join("absent.sock"))
-        .env("LAVISH_BROWSER_EXECUTABLE", dir.join("browser"))
+        .env("SMAD_SOCKET", dir.join("absent.sock"))
+        .env("SMAD_EXECUTABLE", dir.join("browser"))
         .output()
         .unwrap();
     assert!(output.status.success());

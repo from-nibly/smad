@@ -1,6 +1,6 @@
-use lavish_browser_control::SocketServer;
-use lavish_browser_protocol::{Command, PROTOCOL_VERSION, ResponseEnvelope, ResponseStatus};
 use serde_json::{Value, json};
+use smad_control::SocketServer;
+use smad_protocol::{Command, PROTOCOL_VERSION, ResponseEnvelope, ResponseStatus};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::process::Command as ProcessCommand;
@@ -53,10 +53,10 @@ fn startup_and_rename_refresh_labels_without_selecting_the_renamed_tab() {
             server.accept().unwrap().join().unwrap();
         }
     });
-    let mut child = ProcessCommand::new(env!("CARGO_BIN_EXE_lavish-browser-herdr-sync"))
+    let mut child = ProcessCommand::new(env!("CARGO_BIN_EXE_smad-herdr-sync"))
         .args(["--session", "main", "--socket"])
         .arg(&herdr_path)
-        .env("LAVISH_BROWSER_SOCKET", &browser_path)
+        .env("SMAD_SOCKET", &browser_path)
         .spawn()
         .unwrap();
     let (mut events, _) = herdr.accept().unwrap();

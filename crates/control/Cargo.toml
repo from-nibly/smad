@@ -1,10 +1,10 @@
 [package]
-name = "lavish-browser-control"
+name = "smad-control"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-lavish-browser-protocol = { path = "../protocol" }
+smad-protocol = { path = "../protocol" }
 libc = "0.2"
 thiserror = "2.0"

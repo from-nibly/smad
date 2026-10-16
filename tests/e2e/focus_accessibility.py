@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Return the live Lavish Browser AT-SPI window focus/active state."""
+"""Return the live SMAD AT-SPI window focus/active state."""
 import json
 import time
 import pyatspi
@@ -21,7 +21,7 @@ while time.monotonic() < deadline:
     for node in walk(pyatspi.Registry.getDesktop(0)):
         try:
             name = node.name or ""
-            if "Lavish Browser" not in name:
+            if "SMAD" not in name:
                 continue
             states = node.getState()
             print(json.dumps({
@@ -33,4 +33,4 @@ while time.monotonic() < deadline:
         except (LookupError, RuntimeError):
             pass
     time.sleep(.2)
-raise SystemExit("Lavish Browser window missing from AT-SPI")
+raise SystemExit("SMAD window missing from AT-SPI")

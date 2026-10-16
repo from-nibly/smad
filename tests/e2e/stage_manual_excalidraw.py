@@ -5,10 +5,10 @@ import argparse, json, os, pathlib, shutil, subprocess, tempfile, time
 p=argparse.ArgumentParser(); p.add_argument('--prefix',type=pathlib.Path,required=True); p.add_argument('--artifact',type=pathlib.Path,required=True); p.add_argument('--evidence',type=pathlib.Path,required=True); p.add_argument('--display',required=True); a=p.parse_args()
 a.evidence.mkdir(parents=True,exist_ok=True); isolated=pathlib.Path(tempfile.mkdtemp(prefix='lavish-manual-')); runtime=isolated/'r'; state=isolated/'s'; config=isolated/'c'
 for d in (runtime,state,config): d.mkdir(mode=0o700)
-env=os.environ.copy(); env.update({'DISPLAY':a.display,'XDG_RUNTIME_DIR':str(runtime),'XDG_STATE_HOME':str(state),'XDG_CONFIG_HOME':str(config),'LAVISH_BROWSER_EXECUTABLE':str((a.prefix/'bin/lavish-browser').resolve())})
+env=os.environ.copy(); env.update({'DISPLAY':a.display,'XDG_RUNTIME_DIR':str(runtime),'XDG_STATE_HOME':str(state),'XDG_CONFIG_HOME':str(config),'SMAD_EXECUTABLE':str((a.prefix/'bin/smad').resolve())})
 for k in ('ZELLIJ','ZELLIJ_SESSION_NAME','ZELLIJ_PANE_ID'): env.pop(k,None)
-browser_log=(a.evidence/'browser.log').open('w'); browser=subprocess.Popen([str(a.prefix/'bin/lavish-browser')],env=env,stdout=browser_log,stderr=subprocess.STDOUT)
-socket=runtime/'lavish-browser/control.sock'; deadline=time.monotonic()+20
+browser_log=(a.evidence/'browser.log').open('w'); browser=subprocess.Popen([str(a.prefix/'bin/smad')],env=env,stdout=browser_log,stderr=subprocess.STDOUT)
+socket=runtime/'smad/control.sock'; deadline=time.monotonic()+20
 while not socket.exists() and time.monotonic()<deadline: time.sleep(.1)
 if not socket.exists(): raise SystemExit('installed browser socket did not start')
 opened=subprocess.run([str(a.prefix/'bin/lavish-open'),str(a.artifact.resolve())],env=env,text=True,capture_output=True,timeout=180)

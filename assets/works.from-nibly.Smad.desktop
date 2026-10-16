@@ -1,11 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=Lavish Browser
+Name=SMAD
 Comment=Dedicated browser for local Lavish review sessions
-Exec=lavish-browser
-Icon=works.from-nibly.LavishBrowser
+Exec=smad
+Icon=works.from-nibly.Smad
 Terminal=false
 Categories=Development;
 StartupNotify=true
-StartupWMClass=works.from-nibly.LavishBrowser
+StartupWMClass=works.from-nibly.Smad
 X-GNOME-UsesNotifications=false

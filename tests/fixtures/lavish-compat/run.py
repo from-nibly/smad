@@ -131,7 +131,7 @@ def main() -> int:
         "XDG_STATE_HOME": str(state),
         "XDG_CONFIG_HOME": str(config),
         "XDG_DATA_HOME": str(data),
-        "LAVISH_BROWSER_AUTOMATION": "1",
+        "SMAD_AUTOMATION": "1",
         "LAVISH_AXI_STATE_DIR": str(upstream_state),
         "LAVISH_AXI_PORT": str(free_port()),
         "LAVISH_AXI_DEBUG": "1",
@@ -184,7 +184,7 @@ def main() -> int:
 
     try:
         print("seeding production browser state through lavish-open", flush=True)
-        socket = runtime / "lavish-browser" / "control.sock"
+        socket = runtime / "smad" / "control.sock"
         wait_for(socket)
         time.sleep(0.5)
         routed = None
@@ -222,7 +222,7 @@ def main() -> int:
         options = Options()
         options.binary_location = str(args.browser.resolve())
         options.page_load_strategy = "none"
-        options.set_capability("browserName", "Lavish Browser")
+        options.set_capability("browserName", "SMAD")
         print("creating WebKitWebDriver session for production binary", flush=True)
         endpoint = f"http://127.0.0.1:{args.port}"
         driver = webdriver.Remote(
@@ -396,7 +396,7 @@ def main() -> int:
 
         if args.manual_excalidraw:
             artifact.write_text(original)
-            control = args.launcher.resolve().with_name("lavish-browser-ctl")
+            control = args.launcher.resolve().with_name("smad-ctl")
             status = run([str(control), "status", "--json"], env=env)
             automation_pid = json.loads(status.stdout)["state"]["process_id"]
             driver.quit()
@@ -416,7 +416,7 @@ def main() -> int:
             socket.unlink(missing_ok=True)
 
             manual_env = env.copy()
-            manual_env.pop("LAVISH_BROWSER_AUTOMATION", None)
+            manual_env.pop("SMAD_AUTOMATION", None)
             manual_env["DISPLAY"] = args.manual_display
             manual_browser_log = (evidence / "manual-browser.log").open("w")
             browser = subprocess.Popen(
@@ -445,7 +445,7 @@ def main() -> int:
             (evidence / "manual-ready.json").write_text(json.dumps(ready, indent=2))
             print("MANUAL_EXCALIDRAW_READY " + json.dumps(ready), flush=True)
             print(
-                "GUI steps: in Lavish Browser scroll to the Mermaid whiteboard; click 'Click to edit'; "
+                "GUI steps: in SMAD scroll to the Mermaid whiteboard; click 'Click to edit'; "
                 "draw a clearly visible shape; wait 3 seconds; use More > Reload artifact; confirm the shape "
                 "reappears; enter note 'manual Excalidraw persistence confirmation' in the whiteboard; "
                 "click 'Queue feedback'; then report edit visibility and persistence to the conductor.",

@@ -1,6 +1,6 @@
 # Memory-pressure suspension
 
-Lavish Browser normally retains one WebKit WebView per materialized document. It listens to the desktop `GMemoryMonitor` `low-memory-warning` signal and releases inactive views in least-recently-used order:
+SMAD normally retains one WebKit WebView per materialized document. It listens to the desktop `GMemoryMonitor` `low-memory-warning` signal and releases inactive views in least-recently-used order:
 
 - a low warning suspends one materialized inactive document;
 - a medium warning suspends two; and
@@ -14,7 +14,7 @@ If upstream Lavish is no longer available, the recreated view shows the normal r
 
 ## Deterministic warning hook
 
-For installed-app tests and diagnostics, start the browser with `LAVISH_BROWSER_MEMORY_WARNING_FILE` set to a private temporary file. Replacing that file's contents with `low`, `medium`, or `critical` triggers the same suspension path. Numeric GIO levels `50`, `100`, and `255` are also accepted. Change the file contents for each trigger (for example, write `1 medium`, then `2 medium`). Invalid values are ignored and logged.
+For installed-app tests and diagnostics, start the browser with `SMAD_MEMORY_WARNING_FILE` set to a private temporary file. Replacing that file's contents with `low`, `medium`, or `critical` triggers the same suspension path. Numeric GIO levels `50`, `100`, and `255` are also accepted. Change the file contents for each trigger (for example, write `1 medium`, then `2 medium`). Invalid values are ignored and logged.
 
 This hook is disabled unless the environment variable is set. It does not alter the control protocol or expose a production browser action.
 

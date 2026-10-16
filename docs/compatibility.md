@@ -1,6 +1,6 @@
 # Lavish WebKitGTK compatibility gate
 
-The compatibility gate drives the production `lavish-browser` WebView against an unchanged session served by upstream `lavish-axi`. It does not post to private Lavish APIs, serve artifacts, inject application JavaScript, or substitute a test renderer.
+The compatibility gate drives the production `smad` WebView against an unchanged session served by upstream `lavish-axi`. It does not post to private Lavish APIs, serve artifacts, inject application JavaScript, or substitute a test renderer.
 
 ## Validated baseline
 
@@ -46,7 +46,7 @@ For focused compatibility development, use:
 
 ```bash
 nix-shell --run '
-  cargo build --locked -p lavish-browser -p lavish-browser-cli &&
+  cargo build --locked -p smad -p smad-cli &&
   tests/fixtures/lavish-compat/run-live.sh target/compatibility/production
 '
 ```
@@ -62,7 +62,7 @@ WebKitWebDriver cannot reliably produce a faithful Excalidraw canvas gesture. Th
 - a successful owned `lavish-axi poll` result with `tag: whiteboard`; and
 - the added element identity correlated between observation and poll.
 
-The capability generator verifies the recorded installed `lavish-browser` SHA-256 against the freshly installed browser in the same release bundle before accepting retained manual evidence. When evidence is reused across a docs/packaging-only candidate, release validation must additionally compare the installed launcher, control helper, and WASM hashes and reject the residual if any required executable differs. The retained evidence remains ignored run input; documentation does not depend on a particular historical worktree path.
+The capability generator verifies the recorded installed `smad` SHA-256 against the freshly installed browser in the same release bundle before accepting retained manual evidence. When evidence is reused across a docs/packaging-only candidate, release validation must additionally compare the installed launcher, control helper, and WASM hashes and reject the residual if any required executable differs. The retained evidence remains ignored run input; documentation does not depend on a particular historical worktree path.
 
 ## Required capability matrix
 
@@ -82,4 +82,4 @@ The capability generator verifies the recorded installed `lavish-browser` SHA-25
 | Excalidraw persistence/feedback | Exact-hash correlated human edit and real whiteboard poll |
 | Browser-only close | Browser teardown without upstream `end` |
 
-Automation is enabled only when `LAVISH_BROWSER_AUTOMATION=1`; normal application runs do not expose a WebDriver context.
+Automation is enabled only when `SMAD_AUTOMATION=1`; normal application runs do not expose a WebDriver context.

@@ -12,7 +12,7 @@ lavish-open ── npx -y lavish-axi … --no-open
 user-only Unix socket
     │
     ▼
-GTK4 Lavish Browser ── retained WebKitGTK view of the unchanged /session/ URL
+GTK4 SMAD ── retained WebKitGTK view of the unchanged /session/ URL
 ```
 
 The Rust workspace separates the browser control plane from upstream Lavish:
@@ -20,7 +20,7 @@ The Rust workspace separates the browser control plane from upstream Lavish:
 - `protocol` defines bounded, versioned commands and loopback session URL validation.
 - `core` owns project/document state, labels, persistence DTOs, reconciliation, and LRU policy without GUI types.
 - `control` implements the user-restricted Unix socket client/server.
-- `browser-cli` provides `lavish-open`, `lavish-browser-ctl`, and the native HerdR lifecycle helper.
+- `browser-cli` provides `lavish-open`, `smad-ctl`, and the native HerdR lifecycle helper.
 - `browser-app` provides the single-instance plain GTK4 shell and retained WebKitGTK views.
 - `zellij-plugin` is an optional WASM lifecycle adapter.
 

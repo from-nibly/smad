@@ -1,6 +1,6 @@
-# Lavish Browser development
+# SMAD development
 
-Lavish Browser is a production Rust browser/container for unchanged local sessions served by upstream `lavish-axi`. It does not serve artifacts or implement Lavish review APIs. Product boundaries and crate responsibilities are documented in [`docs/architecture.md`](docs/architecture.md).
+SMAD is a production Rust browser/container for unchanged local sessions served by upstream `lavish-axi`. It does not serve artifacts or implement Lavish review APIs. Product boundaries and crate responsibilities are documented in [`docs/architecture.md`](docs/architecture.md).
 
 ## Environment
 

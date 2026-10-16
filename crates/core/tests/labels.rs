@@ -1,4 +1,4 @@
-use lavish_browser_core::labels::{decode_super_tabs_name, project_label};
+use smad_core::labels::{decode_super_tabs_name, project_label};
 
 #[test]
 fn decodes_escaped_metadata() {

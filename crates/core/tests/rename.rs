@@ -1,5 +1,5 @@
-use lavish_browser_core::BrowserModel;
-use lavish_browser_protocol::{ProjectKey, ProjectMetadata};
+use smad_core::BrowserModel;
+use smad_protocol::{ProjectKey, ProjectMetadata};
 
 fn key(workspace: &str) -> ProjectKey {
     ProjectKey::Herdr {

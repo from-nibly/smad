@@ -1,6 +1,6 @@
 # Security model
 
-Lavish Browser accepts executable, potentially untrusted artifact content only through the complete page served by upstream Lavish. The browser does not read local artifact files, serve sibling assets, expose a filesystem bridge, or implement review endpoints.
+SMAD accepts executable, potentially untrusted artifact content only through the complete page served by upstream Lavish. The browser does not read local artifact files, serve sibling assets, expose a filesystem bridge, or implement review endpoints.
 
 Browser-control submissions must be syntactically valid HTTP(S) URLs without credentials, on `127.0.0.1`, `::1`, or `localhost`, with a non-empty `/session/…` path. Arbitrary remote top-level pages and unsafe schemes are rejected. User-activated external HTTP(S) links are handed to the desktop browser; normal remote subresources requested by the upstream page remain governed by WebKit.
 

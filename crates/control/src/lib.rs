@@ -1,6 +1,6 @@
 //! Hardened native Unix-socket transport for browser control.
 
-use lavish_browser_protocol::{
+use smad_protocol::{
     Command, MAX_MESSAGE_BYTES, PROTOCOL_VERSION, RequestEnvelope, ResponseEnvelope,
     ResponseStatus, decode_frame, encode_frame, validate_protocol_version, validate_session_url,
 };
@@ -156,13 +156,15 @@ impl Drop for SocketServer {
 }
 
 pub fn default_socket_path() -> PathBuf {
-    if let Some(path) = std::env::var_os("LAVISH_BROWSER_SOCKET") {
+    if let Some(path) =
+        std::env::var_os("SMAD_SOCKET").or_else(|| std::env::var_os("LAVISH_BROWSER_SOCKET"))
+    {
         return PathBuf::from(path);
     }
     let runtime = std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
-    runtime.join("lavish-browser").join("control.sock")
+    runtime.join("smad").join("control.sock")
 }
 
 fn prepare_parent(path: &Path) -> Result<(), ControlError> {

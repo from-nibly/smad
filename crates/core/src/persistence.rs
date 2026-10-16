@@ -1,8 +1,8 @@
 use crate::{
     BrowserModel, BrowserStateStore, Document, DocumentKey, DocumentLifecycle, Project, ProjectKey,
 };
-use lavish_browser_protocol::validate_session_url;
 use serde::{Deserialize, Serialize};
+use smad_protocol::{DocumentKind, validate_session_url};
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 pub const STATE_SCHEMA_VERSION: u32 = 1;
-const APPLICATION_DIRECTORY: &str = "lavish-browser";
+const APPLICATION_DIRECTORY: &str = "smad";
 const STATE_FILE: &str = "state.json";
 static TEMP_FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -62,12 +62,14 @@ pub struct LoadReport {
 #[derive(Debug, Clone)]
 pub struct MetadataStore {
     state_file: PathBuf,
+    legacy_state_file: Option<PathBuf>,
 }
 
 impl MetadataStore {
     pub fn new(state_directory: impl Into<PathBuf>) -> Self {
         Self {
             state_file: state_directory.into().join(STATE_FILE),
+            legacy_state_file: None,
         }
     }
 
@@ -81,7 +83,9 @@ impl MetadataStore {
         let root = get("XDG_STATE_HOME")
             .or_else(|| get("HOME").map(|home| home.join(".local/state")))
             .ok_or(PersistenceError::MissingStateDirectory)?;
-        Ok(Self::new(root.join(APPLICATION_DIRECTORY)))
+        let mut store = Self::new(root.join(APPLICATION_DIRECTORY));
+        store.legacy_state_file = Some(root.join("lavish-browser").join(STATE_FILE));
+        Ok(store)
     }
 
     pub fn state_file(&self) -> &Path {
@@ -89,7 +93,15 @@ impl MetadataStore {
     }
 
     pub fn load_with_report(&self) -> Result<LoadReport, PersistenceError> {
-        let bytes = match fs::read(&self.state_file) {
+        // Import metadata on first use; never write into or remove the legacy profile.
+        let bytes = match fs::read(&self.state_file).or_else(|error| {
+            if error.kind() == io::ErrorKind::NotFound
+                && let Some(legacy) = &self.legacy_state_file
+            {
+                return fs::read(legacy);
+            }
+            Err(error)
+        }) {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
                 return Ok(LoadReport {
@@ -274,6 +286,8 @@ struct PersistedProject {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PersistedDocument {
+    #[serde(default)]
+    kind: DocumentKind,
     canonical_source_file: String,
     lavish_url: String,
     title: Option<String>,
@@ -295,6 +309,7 @@ impl PersistedState {
                         .documents
                         .iter()
                         .map(|document| PersistedDocument {
+                            kind: document.kind,
                             canonical_source_file: document.key.canonical_source_file.clone(),
                             lavish_url: document.lavish_url.clone(),
                             title: document.title.clone(),
@@ -322,7 +337,16 @@ impl PersistedState {
             }
             let mut documents = Vec::with_capacity(persisted.documents.len());
             for document in persisted.documents {
-                if validate_session_url(&document.lavish_url).is_err() {
+                if match document.kind {
+                    DocumentKind::LavishReview => {
+                        validate_session_url(&document.lavish_url).is_err()
+                    }
+                    DocumentKind::Markdown => {
+                        !crate::markdown::is_markdown_path(Path::new(
+                            &document.canonical_source_file,
+                        )) || !Path::new(&document.canonical_source_file).is_absolute()
+                    }
+                } {
                     rejected_urls += 1;
                     continue;
                 }
@@ -332,6 +356,7 @@ impl PersistedState {
                     continue;
                 }
                 documents.push(Document {
+                    kind: document.kind,
                     key: DocumentKey {
                         project: persisted.key.clone(),
                         canonical_source_file: document.canonical_source_file,

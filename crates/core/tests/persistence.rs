@@ -1,10 +1,8 @@
-use lavish_browser_core::persistence::{
+use smad_core::persistence::{
     CoalescingStateStore, LoadIssue, MetadataStore, STATE_SCHEMA_VERSION,
 };
-use lavish_browser_core::{
-    BrowserModel, BrowserStateStore, DocumentKey, DocumentLifecycle, ProjectKey,
-};
-use lavish_browser_protocol::ProjectMetadata;
+use smad_core::{BrowserModel, BrowserStateStore, DocumentKey, DocumentLifecycle, ProjectKey};
+use smad_protocol::ProjectMetadata;
 use std::cell::RefCell;
 use std::fs;
 use std::path::PathBuf;
@@ -18,7 +16,7 @@ struct TestDirectory(PathBuf);
 impl TestDirectory {
     fn new() -> Self {
         let path = std::env::temp_dir().join(format!(
-            "lavish-browser-persistence-{}-{}",
+            "smad-persistence-{}-{}",
             std::process::id(),
             TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ));
@@ -242,6 +240,31 @@ fn untrusted_persisted_session_urls_are_rejected_and_reported() {
 }
 
 #[test]
+fn smad_imports_legacy_metadata_without_modifying_it() {
+    let directory = TestDirectory::new();
+    let legacy = MetadataStore::new(directory.0.join("lavish-browser"));
+    let model = populated_model();
+    legacy.save(&model).unwrap();
+    let original = fs::read(legacy.state_file()).unwrap();
+    let store = MetadataStore::from_environment(|name| {
+        (name == "XDG_STATE_HOME").then(|| directory.0.clone())
+    })
+    .unwrap();
+    let imported = store.load().unwrap();
+    assert_eq!(imported.projects.len(), model.projects.len());
+    assert!(!store.state_file().exists());
+    store.save(&imported).unwrap();
+    assert_eq!(fs::read(legacy.state_file()).unwrap(), original);
+    assert!(store.state_file().ends_with("smad/state.json"));
+    legacy.save(&BrowserModel::default()).unwrap();
+    assert_eq!(
+        store.load().unwrap(),
+        imported,
+        "new state must win over legacy state"
+    );
+}
+
+#[test]
 fn xdg_falls_back_to_home_and_missing_environment_is_reported() {
     let store = MetadataStore::from_environment(|name| {
         (name == "HOME").then(|| PathBuf::from("/home/example"))
@@ -249,7 +272,7 @@ fn xdg_falls_back_to_home_and_missing_environment_is_reported() {
     .unwrap();
     assert_eq!(
         store.state_file(),
-        PathBuf::from("/home/example/.local/state/lavish-browser/state.json")
+        PathBuf::from("/home/example/.local/state/smad/state.json")
     );
     assert!(MetadataStore::from_environment(|_| None).is_err());
 }

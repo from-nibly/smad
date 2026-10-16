@@ -1,14 +1,15 @@
 //! Shared production launcher and lifecycle-helper behavior.
 
+pub mod axi;
 pub mod herdr;
 
-use lavish_browser_control::{BrowserControl, ControlError, SocketClient, default_socket_path};
-use lavish_browser_core::labels::project_label;
-use lavish_browser_protocol::{
+use serde::Deserialize;
+use smad_control::{BrowserControl, ControlError, SocketClient, default_socket_path};
+use smad_core::labels::project_label;
+use smad_protocol::{
     Command, ProjectKey, ProjectMetadata, RequestEnvelope, ResponseEnvelope, ResponseStatus,
     validate_session_url,
 };
-use serde::Deserialize;
 use std::ffi::OsString;
 use std::io::{self, Write};
 use std::process::{Command as ProcessCommand, ExitStatus, Stdio};
@@ -17,7 +18,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 pub const LAVISH_OPEN_BINARY: &str = "lavish-open";
-pub const CONTROL_BINARY: &str = "lavish-browser-ctl";
+pub const CONTROL_BINARY: &str = "smad-ctl";
 static REQUEST_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug)]
@@ -118,6 +119,33 @@ pub fn run_lavish_open(args: Vec<String>) -> Result<(), String> {
             url: session.url,
         }))
         .map_err(|error| format!("could not route Lavish session to browser: {error}"))?;
+    Ok(())
+}
+
+pub fn run_markdown_open(args: Vec<String>) -> Result<(), String> {
+    let (file, fragment) = match args.as_slice() {
+        [file] => (file, None),
+        [file, option, fragment] if option == "--heading" => (file, Some(fragment.clone())),
+        _ => return Err("usage: lavish-md-open <file.md> [--heading <anchor>]".into()),
+    };
+    let source = smad_core::markdown::canonical_markdown(std::path::Path::new(file))?;
+    // Capture the invoking pane before startup; focus changes must not change ownership.
+    let project = resolve_project(&SystemRunner)?;
+    let client = SocketClient::with_timeout(default_socket_path(), Duration::from_secs(30));
+    ensure_browser(&client)?;
+    let response = client
+        .request(&request(Command::OpenMarkdown {
+            project,
+            source_file: source.to_str().expect("validated UTF-8 path").into(),
+            fragment,
+        }))
+        .map_err(|e| e.to_string())?;
+    if response.status != ResponseStatus::Ok {
+        return Err(response
+            .message
+            .unwrap_or_else(|| "Markdown open rejected".into()));
+    }
+    println!("Opened {} in native Markdown reader", source.display());
     Ok(())
 }
 
@@ -320,7 +348,7 @@ pub fn run_control(args: Vec<String>) -> Result<(), String> {
             }
         }
         [name, json] if name == "status" && json == "--json" => Command::InspectState,
-        _ => return Err("usage: lavish-browser-ctl <select-project|close-project> <zellij-session> <stable-tab-id>\n       lavish-browser-ctl <select-herdr-project|close-herdr-project> <herdr-session> <workspace-id> <tab-id>\n       lavish-browser-ctl status [--json]\n       lavish-browser-ctl ping".to_owned()),
+        _ => return Err("usage: smad-ctl <select-project|close-project> <zellij-session> <stable-tab-id>\n       smad-ctl <select-herdr-project|close-herdr-project> <herdr-session> <workspace-id> <tab-id>\n       smad-ctl status [--json]\n       smad-ctl ping".to_owned()),
     };
     match client.request(&request(command)) {
         Ok(response) => {
@@ -338,22 +366,60 @@ pub fn run_control(args: Vec<String>) -> Result<(), String> {
     }
 }
 
-fn ensure_browser(client: &SocketClient) -> Result<ResponseEnvelope, String> {
+pub(crate) fn ensure_browser(client: &SocketClient) -> Result<ResponseEnvelope, String> {
     match client.request(&request(Command::Ping)) {
         Ok(response) => return Ok(response),
         Err(ControlError::Absent(_)) => {}
         Err(error) => return Err(format!("browser readiness check failed: {error}")),
     }
-    let executable: OsString = std::env::var_os("LAVISH_BROWSER_EXECUTABLE")
-        .unwrap_or_else(|| OsString::from("lavish-browser"));
-    ProcessCommand::new(&executable)
+    let executable: OsString = std::env::var_os("SMAD_EXECUTABLE")
+        .or_else(|| std::env::var_os("LAVISH_BROWSER_EXECUTABLE"))
+        .unwrap_or_else(|| {
+            let sibling = std::env::current_exe()
+                .ok()
+                .and_then(|path| path.parent().map(|parent| parent.join("smad")));
+            sibling
+                .filter(|path| path.is_file())
+                .map(|path| path.into_os_string())
+                .unwrap_or_else(|| OsString::from("smad"))
+        });
+    use std::os::unix::fs::OpenOptionsExt;
+    let log_path = match std::env::var_os("SMAD_SOCKET")
+        .or_else(|| std::env::var_os("LAVISH_BROWSER_SOCKET"))
+    {
+        Some(path) => std::path::PathBuf::from(path).with_extension("log"),
+        None => smad_core::persistence::MetadataStore::from_xdg_environment()
+            .map_err(|e| e.to_string())?
+            .state_file()
+            .with_file_name("server.log"),
+    };
+    if let Some(parent) = log_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let log = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .mode(0o600)
+        .open(&log_path)
+        .map_err(|e| format!("could not open server log {}: {e}", log_path.display()))?;
+    let mut child = ProcessCommand::new(&executable)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(log.try_clone().map_err(|e| e.to_string())?)
+        .stderr(log)
         .spawn()
         .map_err(|error| format!("failed to start {:?}: {error}", executable))?;
     let deadline = Instant::now() + Duration::from_secs(30);
     while Instant::now() < deadline {
+        if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
+            // A concurrent opener may have won GApplication's single-instance race.
+            if let Ok(response) = client.request(&request(Command::Ping)) {
+                return Ok(response);
+            }
+            return Err(format!(
+                "SMAD exited with {status}; inspect {}",
+                log_path.display()
+            ));
+        }
         thread::sleep(Duration::from_millis(100));
         match client.request(&request(Command::Ping)) {
             Ok(response) => return Ok(response),
@@ -361,7 +427,7 @@ fn ensure_browser(client: &SocketClient) -> Result<ResponseEnvelope, String> {
             Err(error) => return Err(format!("browser readiness check failed: {error}")),
         }
     }
-    Err("timed out waiting 30 seconds for lavish-browser control socket".to_owned())
+    Err("timed out waiting 30 seconds for smad control socket".to_owned())
 }
 
 pub fn request(command: Command) -> RequestEnvelope {
@@ -371,7 +437,7 @@ pub fn request(command: Command) -> RequestEnvelope {
 
 pub fn ignored(request_id: String, message: impl Into<String>) -> ResponseEnvelope {
     ResponseEnvelope {
-        protocol_version: lavish_browser_protocol::PROTOCOL_VERSION,
+        protocol_version: smad_protocol::PROTOCOL_VERSION,
         request_id,
         status: ResponseStatus::Ignored,
         error_code: None,

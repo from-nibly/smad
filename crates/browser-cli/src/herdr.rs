@@ -1,7 +1,7 @@
-use lavish_browser_control::{BrowserControl, ControlError, SocketClient, default_socket_path};
-use lavish_browser_protocol::Command;
 use serde::Deserialize;
 use serde_json::Value;
+use smad_control::{BrowserControl, ControlError, SocketClient, default_socket_path};
+use smad_protocol::Command;
 use std::collections::HashMap;
 use std::env;
 use std::io::{BufRead, BufReader, Write};
@@ -62,7 +62,7 @@ pub fn run_herdr_sync(arguments: Vec<String>) -> Result<(), String> {
     loop {
         if let Err(error) = synchronize(&options, &browser_client()) {
             eprintln!(
-                "lavish-browser-herdr-sync: waiting for HerdR session {:?}: {error}",
+                "smad-herdr-sync: waiting for HerdR session {:?}: {error}",
                 options.session_name
             );
             thread::sleep(Duration::from_secs(1));
@@ -100,7 +100,7 @@ impl SyncOptions {
                 "--once" => once = true,
                 "-h" | "--help" => {
                     return Err(
-                        "usage: lavish-browser-herdr-sync [--session NAME] [--socket PATH] [--once]"
+                        "usage: smad-herdr-sync [--session NAME] [--socket PATH] [--once]"
                             .to_owned(),
                     );
                 }

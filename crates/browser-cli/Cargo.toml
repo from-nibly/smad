@@ -1,24 +1,33 @@
 [package]
-name = "lavish-browser-cli"
+name = "smad-cli"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-lavish-browser-control = { path = "../control" }
-lavish-browser-core = { path = "../core" }
-lavish-browser-protocol = { path = "../protocol" }
+smad-control = { path = "../control" }
+smad-core = { path = "../core" }
+smad-protocol = { path = "../protocol" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+toon-format = { version = "0.7", default-features = false }
+
+[[bin]]
+name = "smad-axi"
+path = "src/bin/smad-axi.rs"
+
+[[bin]]
+name = "lavish-md-open"
+path = "src/bin/lavish-md-open.rs"
 
 [[bin]]
 name = "lavish-open"
 path = "src/bin/lavish-open.rs"
 
 [[bin]]
-name = "lavish-browser-ctl"
-path = "src/bin/lavish-browser-ctl.rs"
+name = "smad-ctl"
+path = "src/bin/smad-ctl.rs"
 
 [[bin]]
-name = "lavish-browser-herdr-sync"
-path = "src/bin/lavish-browser-herdr-sync.rs"
+name = "smad-herdr-sync"
+path = "src/bin/smad-herdr-sync.rs"

@@ -1,5 +1,5 @@
-use lavish_browser_protocol::{ProjectKey, ProjectMetadata};
 use serde::{Deserialize, Serialize};
+use smad_protocol::{DocumentKind, ProjectKey, ProjectMetadata};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DocumentKey {
@@ -19,6 +19,8 @@ pub enum DocumentLifecycle {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Document {
     pub key: DocumentKey,
+    #[serde(default)]
+    pub kind: DocumentKind,
     pub lavish_url: String,
     pub title: Option<String>,
     pub lifecycle: DocumentLifecycle,
@@ -59,12 +61,45 @@ impl BrowserModel {
         lavish_url: impl Into<String>,
         activated_at: u64,
     ) -> OpenOutcome {
-        let source = canonical_source_file.into();
-        let url = lavish_url.into();
+        self.open_document(
+            project,
+            canonical_source_file.into(),
+            lavish_url.into(),
+            DocumentKind::LavishReview,
+            activated_at,
+        )
+    }
+
+    pub fn open_markdown(
+        &mut self,
+        project: ProjectMetadata,
+        source: String,
+        activated_at: u64,
+    ) -> OpenOutcome {
+        self.open_document(
+            project,
+            source,
+            String::new(),
+            DocumentKind::Markdown,
+            activated_at,
+        )
+    }
+
+    fn open_document(
+        &mut self,
+        project: ProjectMetadata,
+        source: String,
+        url: String,
+        kind: DocumentKind,
+        activated_at: u64,
+    ) -> OpenOutcome {
         let mut refreshed_documents = 0;
         for existing_project in &mut self.projects {
             for document in &mut existing_project.documents {
-                if document.key.canonical_source_file == source && document.lavish_url != url {
+                if document.key.canonical_source_file == source
+                    && document.kind == kind
+                    && document.lavish_url != url
+                {
                     document.lavish_url.clone_from(&url);
                     document.lifecycle = DocumentLifecycle::Dormant;
                     document.load_error = None;
@@ -108,6 +143,7 @@ impl BrowserModel {
                     project: target.key.clone(),
                     canonical_source_file: source.clone(),
                 },
+                kind,
                 lavish_url: url,
                 title: None,
                 lifecycle: DocumentLifecycle::Dormant,

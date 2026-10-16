@@ -19,7 +19,7 @@ done
 [[ -n ${DISPLAY:-} ]] || echo "INFO: using isolated Xvfb; no ambient display inherited" >&2
 
 "$root/packaging/install.sh" --prefix "$prefix" --profile "$profile"
-desktop-file-validate "$prefix/share/applications/works.from-nibly.LavishBrowser.desktop"
+desktop-file-validate "$prefix/share/applications/works.from-nibly.Smad.desktop"
 
 session_conf=$(find /nix/store -path '*/share/dbus-1/session.conf' | head -1)
 atspi_conf=$(find /nix/store -path '*at-spi2-core-*/share/defaults/at-spi2/accessibility.conf' | head -1)
@@ -67,7 +67,7 @@ manual=()
 # Re-run the full unchanged-Lavish compatibility gate against installed paths.
 set +e
 python -u "$root/tests/fixtures/lavish-compat/run.py" \
-  --browser "$prefix/bin/lavish-browser" \
+  --browser "$prefix/bin/smad" \
   --launcher "$prefix/bin/lavish-open" \
   --evidence "$evidence/compatibility" \
   --port "${LAVISH_WEBDRIVER_PORT:-9595}" \

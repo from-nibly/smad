@@ -1,22 +1,30 @@
+#[path = "highlight.rs"]
+mod highlight;
+#[path = "markdown.rs"]
+mod markdown;
 #[path = "memory.rs"]
 mod memory;
+#[path = "mermaid.rs"]
+mod mermaid;
+#[path = "surface.rs"]
+mod surface;
+#[path = "table.rs"]
+mod table;
 #[path = "webview/mod.rs"]
 mod webview;
 
 use gtk::gio;
 use gtk::glib;
 use gtk::prelude::*;
-use lavish_browser_control::{SocketServer, default_socket_path};
-use lavish_browser_core::persistence::MetadataStore;
-use lavish_browser_core::reconcile::{
+use smad_control::{SocketServer, default_socket_path};
+use smad_core::persistence::MetadataStore;
+use smad_core::reconcile::{
     ZellijCommandState, reconcile_from_source, reconcile_from_source_preserving_runtime,
 };
-use lavish_browser_core::{
-    BrowserModel, BrowserStateStore, DocumentKey, DocumentLifecycle, ProjectKey,
-};
-use lavish_browser_protocol::{
-    BrowserStateSnapshot, Command, DocumentLifecycleSnapshot, DocumentSnapshot, PROTOCOL_VERSION,
-    ProjectSnapshot, RequestEnvelope, ResponseEnvelope, ResponseStatus,
+use smad_core::{BrowserModel, BrowserStateStore, DocumentKey, DocumentLifecycle, ProjectKey};
+use smad_protocol::{
+    BrowserStateSnapshot, Command, DocumentKind, DocumentLifecycleSnapshot, DocumentSnapshot,
+    PROTOCOL_VERSION, ProjectSnapshot, RequestEnvelope, ResponseEnvelope, ResponseStatus,
 };
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -25,7 +33,7 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-const APPLICATION_ID: &str = "works.from-nibly.LavishBrowser";
+const APPLICATION_ID: &str = "works.from-nibly.Smad";
 
 pub fn run() -> glib::ExitCode {
     webview::configure_automation_from_environment();
@@ -61,7 +69,7 @@ pub fn run() -> glib::ExitCode {
                     *controller.borrow_mut() = Some(created);
                 }
                 Err(error) => {
-                    eprintln!("failed to start Lavish Browser: {error}");
+                    eprintln!("failed to start SMAD: {error}");
                     app.quit();
                 }
             }
@@ -83,7 +91,7 @@ struct AppController {
     store: MetadataStore,
     rendering: Cell<bool>,
     presentation_count: Cell<u64>,
-    document_views: RefCell<webview::RetainedRegistry<DocumentKey, Rc<webview::DocumentView>>>,
+    document_views: RefCell<webview::RetainedRegistry<DocumentKey, Rc<surface::DocumentView>>>,
     project_stacks: RefCell<HashMap<ProjectKey, gtk::Stack>>,
     memory_monitor: gio::MemoryMonitor,
 }
@@ -118,18 +126,18 @@ impl AppController {
         download_status.set_visible(false);
 
         let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        root.set_widget_name("lavish-browser-content");
+        root.set_widget_name("smad-content");
         root.append(&notebook);
         root.append(&download_status);
 
         let window = gtk::ApplicationWindow::builder()
             .application(app)
-            .title("Lavish Browser")
+            .title("SMAD")
             .default_width(1280)
             .default_height(800)
             .child(&root)
             .build();
-        window.set_widget_name("lavish-browser-window");
+        window.set_widget_name("smad-window");
         webview::configure_downloads(&window, &download_status);
 
         let controller = Rc::new(Self {
@@ -167,7 +175,7 @@ impl AppController {
                 controller.handle_memory_warning(level, "GIO MemoryMonitor");
             });
 
-        let Some(path) = std::env::var_os("LAVISH_BROWSER_MEMORY_WARNING_FILE") else {
+        let Some(path) = std::env::var_os("SMAD_MEMORY_WARNING_FILE") else {
             return;
         };
         let mut previous = String::new();
@@ -329,11 +337,64 @@ impl AppController {
     fn handle_command(self: &Rc<Self>, request: RequestEnvelope) -> ResponseEnvelope {
         let request_id = request.request_id;
         match request.command {
+            Command::OpenMarkdown {
+                project,
+                source_file,
+                fragment,
+            } => {
+                let source = match smad_core::markdown::canonical_markdown(Path::new(&source_file))
+                {
+                    Ok(path) => path.to_str().expect("validated path").to_owned(),
+                    Err(error) => return response(request_id, ResponseStatus::Error, &error, None),
+                };
+                if self.conflicting_kind(&source, DocumentKind::Markdown) {
+                    return response(
+                        request_id,
+                        ResponseStatus::Error,
+                        "source already open as another document kind",
+                        None,
+                    );
+                }
+                self.reconcile_live_zellij_projects();
+                let key = DocumentKey {
+                    project: project.key.clone(),
+                    canonical_source_file: source.clone(),
+                };
+                self.mutate_with_render(
+                    |model| {
+                        model.open_markdown(project, source, timestamp());
+                        true
+                    },
+                    false,
+                );
+                if let Some(fragment) = fragment
+                    && let Some(view) = self.document_views.borrow().get(&key)
+                {
+                    view.heading(&fragment);
+                }
+                self.presentation_count
+                    .set(self.presentation_count.get().saturating_add(1));
+                self.window.present();
+                response(
+                    request_id,
+                    ResponseStatus::Ok,
+                    "native Markdown opened",
+                    None,
+                )
+            }
             Command::OpenUrl {
                 project,
                 source_file,
                 url,
             } => {
+                if self.conflicting_kind(&source_file, DocumentKind::LavishReview) {
+                    return response(
+                        request_id,
+                        ResponseStatus::Error,
+                        "source already open as another document kind",
+                        None,
+                    );
+                }
                 self.reconcile_live_zellij_projects();
                 let structural_open = {
                     let model = self.model.borrow();
@@ -685,7 +746,7 @@ impl AppController {
         self.rendering.set(false);
     }
 
-    fn project_tab(self: &Rc<Self>, project: &lavish_browser_core::Project) -> gtk::Box {
+    fn project_tab(self: &Rc<Self>, project: &smad_core::Project) -> gtk::Box {
         let identity = project_identity(&project.key);
         let tab = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         tab.set_widget_name(&format!("project-tab-{identity}"));
@@ -725,7 +786,7 @@ impl AppController {
 
     fn project_page(
         self: &Rc<Self>,
-        project: &lavish_browser_core::Project,
+        project: &smad_core::Project,
         globally_selected: bool,
     ) -> gtk::Paned {
         let identity = project_identity(&project.key);
@@ -875,7 +936,7 @@ impl AppController {
 
     fn document_surface(
         self: &Rc<Self>,
-        document: &lavish_browser_core::Document,
+        document: &smad_core::Document,
         project_is_globally_selected: bool,
         selected_source: Option<&str>,
     ) -> gtk::Widget {
@@ -894,10 +955,16 @@ impl AppController {
         }
     }
 
-    fn document_view(
-        self: &Rc<Self>,
-        document: &lavish_browser_core::Document,
-    ) -> Rc<webview::DocumentView> {
+    fn conflicting_kind(&self, source: &str, kind: DocumentKind) -> bool {
+        self.model
+            .borrow()
+            .projects
+            .iter()
+            .flat_map(|p| &p.documents)
+            .any(|d| d.key.canonical_source_file == source && d.kind != kind)
+    }
+
+    fn document_view(self: &Rc<Self>, document: &smad_core::Document) -> Rc<surface::DocumentView> {
         if let Some(view) = self.document_views.borrow().get(&document.key).cloned() {
             if view.loaded_url() != document.lavish_url {
                 view.navigate(&document.lavish_url);
@@ -913,9 +980,9 @@ impl AppController {
 
     fn create_document_view(
         self: &Rc<Self>,
-        document: &lavish_browser_core::Document,
+        document: &smad_core::Document,
         automation: bool,
-    ) -> Rc<webview::DocumentView> {
+    ) -> Rc<surface::DocumentView> {
         let key = document.key.clone();
         let weak = Rc::downgrade(self);
         let event_key = key.clone();
@@ -934,7 +1001,50 @@ impl AppController {
             document.key.canonical_source_file,
             project_accessible_identity(&document.key.project)
         );
-        if automation {
+        if document.kind == DocumentKind::Markdown {
+            let weak = Rc::downgrade(self);
+            let project_key = key.project.clone();
+            let navigate = Rc::new(move |path: String, fragment: Option<String>| {
+                if let Some(controller) = weak.upgrade() {
+                    let project = controller
+                        .model
+                        .borrow()
+                        .projects
+                        .iter()
+                        .find(|p| p.key == project_key)
+                        .map(|p| smad_protocol::ProjectMetadata {
+                            key: p.key.clone(),
+                            label: p.label.clone(),
+                            raw_tab_name: p.raw_tab_name.clone(),
+                        });
+                    if let Some(project) = project {
+                        let result = controller.handle_command(RequestEnvelope::new(
+                            "markdown-link",
+                            Command::OpenMarkdown {
+                                project,
+                                source_file: path,
+                                fragment,
+                            },
+                        ));
+                        return if result.status == ResponseStatus::Ok {
+                            Ok(())
+                        } else {
+                            Err(result.message.unwrap_or_default())
+                        };
+                    }
+                }
+                Err("document project is no longer open".into())
+            });
+            return Rc::new(surface::DocumentView::Markdown(
+                markdown::MarkdownView::new(
+                    Path::new(&key.canonical_source_file),
+                    &identity,
+                    emit,
+                    navigate,
+                ),
+            ));
+        }
+        Rc::new(surface::DocumentView::Review(if automation {
             webview::DocumentView::new_for_automation(
                 &document.lavish_url,
                 &identity,
@@ -950,7 +1060,7 @@ impl AppController {
                 &self.window,
                 emit,
             )
-        }
+        }))
     }
 
     fn automation_webview(self: &Rc<Self>) -> Option<webkit6::WebView> {
@@ -968,8 +1078,11 @@ impl AppController {
                 .find(|document| &document.key.canonical_source_file == source)?
                 .clone()
         };
+        if document.kind != DocumentKind::LavishReview {
+            return None;
+        }
         let view = self.create_document_view(&document, true);
-        let webview = view.automation_webview();
+        let webview = view.automation_webview()?;
         self.document_views
             .borrow_mut()
             .insert(document.key.clone(), view);
@@ -1003,6 +1116,11 @@ impl AppController {
                     document.load_error = None;
                     document.title = title;
                 }
+                webview::DocumentEvent::ReadyWithWarnings(title, warning) => {
+                    document.lifecycle = DocumentLifecycle::Ready;
+                    document.load_error = Some(warning);
+                    document.title = title;
+                }
                 webview::DocumentEvent::Failed(error) => {
                     document.lifecycle = DocumentLifecycle::Failed;
                     document.load_error = Some(error);
@@ -1023,10 +1141,7 @@ impl AppController {
     }
 }
 
-fn document_row(
-    document: &lavish_browser_core::Document,
-    controller: &Rc<AppController>,
-) -> gtk::ListBoxRow {
+fn document_row(document: &smad_core::Document, controller: &Rc<AppController>) -> gtk::ListBoxRow {
     let (basename, detail_text) =
         document_row_labels(&document.key.canonical_source_file, &document.lifecycle);
     let labels = gtk::Box::new(gtk::Orientation::Vertical, 1);
@@ -1104,7 +1219,7 @@ fn document_row_labels(source: &str, lifecycle: &DocumentLifecycle) -> (String, 
 }
 
 fn document_placeholder(
-    document: &lavish_browser_core::Document,
+    document: &smad_core::Document,
     controller: &Rc<AppController>,
 ) -> gtk::Widget {
     let identity = document_identity(&document.key);
@@ -1192,6 +1307,7 @@ fn response(
 
 fn snapshot(model: &BrowserModel, presentation_count: u64) -> BrowserStateSnapshot {
     BrowserStateSnapshot {
+        version: Some(env!("CARGO_PKG_VERSION").into()),
         projects: model
             .projects
             .iter()
@@ -1203,6 +1319,8 @@ fn snapshot(model: &BrowserModel, presentation_count: u64) -> BrowserStateSnapsh
                     .documents
                     .iter()
                     .map(|document| DocumentSnapshot {
+                        kind: document.kind,
+                        diagnostic: document.load_error.clone(),
                         source_file: document.key.canonical_source_file.clone(),
                         url: document.lavish_url.clone(),
                         title: document.title.clone(),
@@ -1309,8 +1427,8 @@ mod tests {
         document_identity, document_row_labels, project_identity, selection_requires_render,
         snapshot,
     };
-    use lavish_browser_core::{BrowserModel, DocumentKey, DocumentLifecycle};
-    use lavish_browser_protocol::{ProjectKey, ProjectMetadata};
+    use smad_core::{BrowserModel, DocumentKey, DocumentLifecycle};
+    use smad_protocol::{ProjectKey, ProjectMetadata};
 
     #[test]
     fn stable_identifiers_ignore_mutable_project_and_document_state() {

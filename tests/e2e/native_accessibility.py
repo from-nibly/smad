@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Query and drive stable Lavish Browser controls through the live AT-SPI tree."""
+"""Query and drive stable SMAD controls through the live AT-SPI tree."""
 from __future__ import annotations
 
 import argparse

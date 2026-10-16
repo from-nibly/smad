@@ -1,5 +1,5 @@
 [package]
-name = "lavish-browser-protocol"
+name = "smad-protocol"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true

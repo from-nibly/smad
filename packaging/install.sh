@@ -11,7 +11,7 @@ usage() {
   cat <<'EOF'
 Usage: packaging/install.sh [--prefix PATH] [--destdir PATH] [--profile debug|release] [--no-build]
 
-Installs Lavish Browser's native binaries, desktop metadata, and optional
+Installs SMAD's native binaries, desktop metadata, and optional
 Zellij plugin. DESTDIR is honored for package staging; installed desktop and
 plugin paths continue to use PREFIX.
 EOF
@@ -35,8 +35,8 @@ case $profile in
 esac
 
 if ((build)); then
-  cargo build --locked "${cargo_flags[@]}" -p lavish-browser -p lavish-browser-cli
-  cargo build --locked "${cargo_flags[@]}" -p lavish-browser-zellij --target wasm32-wasip1
+  cargo build --locked "${cargo_flags[@]}" -p smad -p smad-cli
+  cargo build --locked "${cargo_flags[@]}" -p smad-zellij --target wasm32-wasip1
 fi
 
 native_dir=${CARGO_TARGET_DIR:-$root/target}/$cargo_profile
@@ -44,17 +44,30 @@ wasm_dir=${CARGO_TARGET_DIR:-$root/target}/wasm32-wasip1/$cargo_profile
 stage=${destdir%/}${prefix}
 
 install -d "$stage/bin" "$stage/share/applications" "$stage/share/icons/hicolor/scalable/apps" \
-  "$stage/share/lavish-browser/zellij"
-install -m 0755 "$native_dir/lavish-browser" "$stage/bin/lavish-browser"
+  "$stage/share/smad/zellij"
+install -m 0755 "$native_dir/smad" "$stage/bin/smad"
+install -m 0755 "$native_dir/smad-axi" "$stage/bin/smad-axi"
 install -m 0755 "$native_dir/lavish-open" "$stage/bin/lavish-open"
-install -m 0755 "$native_dir/lavish-browser-ctl" "$stage/bin/lavish-browser-ctl"
-install -m 0755 "$native_dir/lavish-browser-herdr-sync" "$stage/bin/lavish-browser-herdr-sync"
-install -m 0644 "$wasm_dir/lavish_browser_zellij.wasm" \
-  "$stage/share/lavish-browser/zellij/lavish-browser-zellij.wasm"
-install -m 0644 "$root/assets/works.from-nibly.LavishBrowser.desktop" "$stage/share/applications/"
-install -m 0644 "$root/assets/works.from-nibly.LavishBrowser.svg" \
-  "$stage/share/icons/hicolor/scalable/apps/works.from-nibly.LavishBrowser.svg"
+install -m 0755 "$native_dir/lavish-md-open" "$stage/bin/lavish-md-open"
+install -m 0755 "$native_dir/smad-ctl" "$stage/bin/smad-ctl"
+install -m 0755 "$native_dir/smad-herdr-sync" "$stage/bin/smad-herdr-sync"
+install -m 0644 "$wasm_dir/smad_zellij.wasm" \
+  "$stage/share/smad/zellij/smad-zellij.wasm"
+install -m 0644 "$root/assets/works.from-nibly.Smad.desktop" "$stage/share/applications/"
+install -m 0644 "$root/assets/works.from-nibly.Smad.Uri.desktop" "$stage/share/applications/"
+install -d "$stage/share/smad/skills"
+cp -R "$root/skills/smad" "$stage/share/smad/skills/"
+install -d "$stage/share/smad/licenses"
+cp -R "$root/licenses/." "$stage/share/smad/licenses/"
+python3 "$root/packaging/licenses.py" "$stage/share/smad/licenses/cargo"
+# Transition entry points; new integrations should use smad-axi.
+ln -sfn smad "$stage/bin/lavish-browser"
+ln -sfn smad "$stage/bin/smad-server"
+ln -sfn smad-ctl "$stage/bin/lavish-browser-ctl"
+ln -sfn smad-herdr-sync "$stage/bin/lavish-browser-herdr-sync"
+install -m 0644 "$root/assets/works.from-nibly.Smad.svg" \
+  "$stage/share/icons/hicolor/scalable/apps/works.from-nibly.Smad.svg"
 
-printf 'Installed Lavish Browser under %s\n' "$stage"
-printf 'HerdR lifecycle helper: %s/bin/lavish-browser-herdr-sync\n' "$prefix"
-printf 'Optional Zellij plugin: %s/share/lavish-browser/zellij/lavish-browser-zellij.wasm\n' "$prefix"
+printf 'Installed SMAD under %s\n' "$stage"
+printf 'HerdR lifecycle helper: %s/bin/smad-herdr-sync\n' "$prefix"
+printf 'Optional Zellij plugin: %s/share/smad/zellij/smad-zellij.wasm\n' "$prefix"

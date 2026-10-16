@@ -1,5 +1,5 @@
-use lavish_browser_core::{BrowserModel, DocumentKey, DocumentLifecycle, ProjectKey};
-use lavish_browser_protocol::ProjectMetadata;
+use smad_core::{BrowserModel, DocumentKey, DocumentLifecycle, ProjectKey};
+use smad_protocol::ProjectMetadata;
 
 fn zellij(tab: u32) -> ProjectMetadata {
     ProjectMetadata {

@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix="lavish-rename-ui-") as directory:
         path = root / key
         path.mkdir(mode=0o700)
         env[key] = str(path)
-    env["LAVISH_BROWSER_SOCKET"] = str(root / "browser.sock")
+    env["SMAD_SOCKET"] = str(root / "browser.sock")
     for key in ("ZELLIJ", "ZELLIJ_SESSION_NAME", "ZELLIJ_PANE_ID"):
         env.pop(key, None)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Page)
@@ -58,7 +58,7 @@ with tempfile.TemporaryDirectory(prefix="lavish-rename-ui-") as directory:
     def request(command):
         with socket.socket(socket.AF_UNIX) as client:
             client.settimeout(10)
-            client.connect(env["LAVISH_BROWSER_SOCKET"])
+            client.connect(env["SMAD_SOCKET"])
             client.sendall((json.dumps({"protocol_version": 2, "request_id": "rename-test", "command": command}) + "\n").encode())
             return json.loads(client.makefile().readline())
 
@@ -91,7 +91,7 @@ with tempfile.TemporaryDirectory(prefix="lavish-rename-ui-") as directory:
         assert rename("unknown", "Ignored")["status"] == "ignored"
         time.sleep(0.5)
         assert len(loads) == load_count, "rename reloaded a retained document"
-        saved = json.loads((Path(env["XDG_STATE_HOME"]) / "lavish-browser/state.json").read_text())
+        saved = json.loads((Path(env["XDG_STATE_HOME"]) / "smad/state.json").read_text())
         assert "Final" in json.dumps(saved), "rename was not persisted"
         assert app.poll() is None
         print("PASS: native rename, Unicode/empty labels, selection/presentation preservation, unknown no-op, persistence and retained pages")

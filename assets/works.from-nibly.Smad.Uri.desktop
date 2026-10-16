@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=SMAD Document Link
+Comment=Open explicitly typed agent documents
+Exec=smad-axi open %u
+Icon=works.from-nibly.Smad
+Terminal=false
+NoDisplay=true
+MimeType=x-scheme-handler/md;x-scheme-handler/lavish;
+Categories=Development;Viewer;

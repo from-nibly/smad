@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Installed Lavish Browser integration smoke using only live system boundaries."""
+"""Installed SMAD integration smoke using only live system boundaries."""
 from __future__ import annotations
 
 import argparse
@@ -95,7 +95,7 @@ def browser_request(runtime: Path, command: dict) -> dict:
     }
     with socket.socket(socket.AF_UNIX) as client:
         client.settimeout(10)
-        client.connect(str(runtime / "lavish-browser/control.sock"))
+        client.connect(str(runtime / "smad/control.sock"))
         client.sendall(json.dumps(request).encode() + b"\n")
         response = b""
         while not response.endswith(b"\n"):
@@ -167,7 +167,7 @@ def webdriver_session(browser: Path, port: int):
     options = Options()
     options.binary_location = str(browser)
     options.page_load_strategy = "none"
-    options.set_capability("browserName", "Lavish Browser")
+    options.set_capability("browserName", "SMAD")
     endpoint = f"http://127.0.0.1:{port}"
     return webdriver.Remote(
         command_executor=endpoint,
@@ -187,10 +187,10 @@ def main() -> int:
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
     prefix = args.prefix.resolve()
-    browser = prefix / "bin/lavish-browser"
+    browser = prefix / "bin/smad"
     launcher = prefix / "bin/lavish-open"
-    ctl = prefix / "bin/lavish-browser-ctl"
-    plugin = prefix / "share/lavish-browser/zellij/lavish-browser-zellij.wasm"
+    ctl = prefix / "bin/smad-ctl"
+    plugin = prefix / "share/smad/zellij/smad-zellij.wasm"
     required = [browser, launcher, ctl, plugin]
     if missing := [str(path) for path in required if not path.is_file()]:
         raise SystemExit(f"installed artifacts missing: {missing}")
@@ -204,7 +204,7 @@ def main() -> int:
         }
         for path in required
     }
-    for asset in sorted((prefix / "share/applications").glob("works.from-nibly.LavishBrowser.desktop")) + sorted((prefix / "share/icons/hicolor/scalable/apps").glob("works.from-nibly.LavishBrowser.svg")):
+    for asset in sorted((prefix / "share/applications").glob("works.from-nibly.Smad.desktop")) + sorted((prefix / "share/icons/hicolor/scalable/apps").glob("works.from-nibly.Smad.svg")):
         installed_manifest[str(asset.relative_to(prefix))] = {
             "path": str(asset), "sha256": hashlib.sha256(asset.read_bytes()).hexdigest(), "bytes": asset.stat().st_size,
         }
@@ -235,10 +235,10 @@ def main() -> int:
     env.update({
         "XDG_RUNTIME_DIR": str(runtime), "XDG_STATE_HOME": str(state_home),
         "XDG_CONFIG_HOME": str(config), "XDG_CACHE_HOME": str(cache), "XDG_DATA_HOME": str(data),
-        "LAVISH_BROWSER_EXECUTABLE": str(browser),
-        "LAVISH_BROWSER_AUTOMATION": "1",
-        "LAVISH_BROWSER_MEMORY_WARNING_FILE": str(evidence / "memory-warning"),
-        "LAVISH_BROWSER_CTL_TRACE": str(evidence / "control-helper.trace"),
+        "SMAD_EXECUTABLE": str(browser),
+        "SMAD_AUTOMATION": "1",
+        "SMAD_MEMORY_WARNING_FILE": str(evidence / "memory-warning"),
+        "SMAD_CTL_TRACE": str(evidence / "control-helper.trace"),
         "LAVISH_AXI_STATE_DIR": str(lavish_state),
         "LAVISH_AXI_PORT": str(lavish_port),
     })
@@ -383,7 +383,7 @@ def main() -> int:
             if candidate.poll() is None:
                 candidate.terminate()
                 candidate.wait(timeout=5)
-            (runtime / "lavish-browser/control.sock").unlink(missing_ok=True)
+            (runtime / "smad/control.sock").unlink(missing_ok=True)
             time.sleep(1)
         raise RuntimeError(
             f"installed browser did not become ready; final exit={candidate.returncode if candidate else None}"
@@ -522,7 +522,7 @@ def main() -> int:
         lifecycle_control("select-project", first)
         time.sleep(1)
         process.terminate(); process.wait(timeout=15)
-        (runtime / "lavish-browser/control.sock").unlink(missing_ok=True)
+        (runtime / "smad/control.sock").unlink(missing_ok=True)
         driver = webdriver_session(browser, args.webdriver_port)
         driver.get(next(iter(shared_urls)))
         wait = WebDriverWait(driver, 45)
@@ -543,14 +543,14 @@ def main() -> int:
         automation_pid = state(ctl, env)["process_id"]
         driver.quit(); driver = None
         terminate_pid(automation_pid)
-        (runtime / "lavish-browser/control.sock").unlink(missing_ok=True)
+        (runtime / "smad/control.sock").unlink(missing_ok=True)
         process = start_browser()
 
         second = shared_keys[1]
         lifecycle_control("select-project", second)
         time.sleep(1)
         process.terminate(); process.wait(timeout=15)
-        (runtime / "lavish-browser/control.sock").unlink(missing_ok=True)
+        (runtime / "smad/control.sock").unlink(missing_ok=True)
         driver = webdriver_session(browser, args.webdriver_port)
         driver.get(next(iter(shared_urls)))
         wait = WebDriverWait(driver, 45)
@@ -566,7 +566,7 @@ def main() -> int:
         automation_pid = state(ctl, env)["process_id"]
         driver.quit(); driver = None
         terminate_pid(automation_pid)
-        (runtime / "lavish-browser/control.sock").unlink(missing_ok=True)
+        (runtime / "smad/control.sock").unlink(missing_ok=True)
         process = start_browser()
         passed("shared_session_feedback", "one real upstream session in two retained project views; first-view feedback woke real poll and appeared in the second view")
 
@@ -683,7 +683,7 @@ def main() -> int:
                 raise RuntimeError(f"recovered upstream returned HTTP {response.status}")
         time.sleep(1)
         process.terminate(); process.wait(timeout=15)
-        (runtime / "lavish-browser/control.sock").unlink(missing_ok=True)
+        (runtime / "smad/control.sock").unlink(missing_ok=True)
         driver = webdriver_session(browser, args.webdriver_port)
         driver.get(recovered_url)
         wait = WebDriverWait(driver, 45)
@@ -693,7 +693,7 @@ def main() -> int:
         automation_pid = state(ctl, env)["process_id"]
         driver.quit(); driver = None
         terminate_pid(automation_pid)
-        (runtime / "lavish-browser/control.sock").unlink(missing_ok=True)
+        (runtime / "smad/control.sock").unlink(missing_ok=True)
         process = start_browser()
         passed("stale_url_reconnect", "all project-scoped matching views exposed native Failed/reconnect state, then ordinary installed launch on a real owned refresh port globally recovered them; production WebDriver loaded the recovered session")
 
@@ -823,7 +823,7 @@ def main() -> int:
         # helper and emit changed/unchanged active events. No helper process can
         # run, the browser must not be launched/replaced, and Zellij stays live.
         degradation = {}
-        ctl_disabled = ctl.with_name("lavish-browser-ctl.disabled-e2e")
+        ctl_disabled = ctl.with_name("smad-ctl.disabled-e2e")
         ctl.rename(ctl_disabled)
         trace_before_missing = helper_trace.read_text().splitlines()
         pid_before_missing = process.pid
@@ -858,7 +858,7 @@ def main() -> int:
         # event coalescing bounds invocations. Restore the browser, then prove a
         # later changed event recovers normal selection.
         process.terminate(); process.wait(timeout=15)
-        (runtime / "lavish-browser/control.sock").unlink(missing_ok=True)
+        (runtime / "smad/control.sock").unlink(missing_ok=True)
         lifecycle_before_stopped = sum(
             "\tselect-project\t" in line or "\tclose-project\t" in line
             for line in helper_trace.read_text().splitlines()
@@ -871,7 +871,7 @@ def main() -> int:
         time.sleep(1)
         run(["zellij", "--session", session, "action", "close-pane"], zellij_env)
         time.sleep(3)
-        if (runtime / "lavish-browser/control.sock").exists() or process.poll() is None:
+        if (runtime / "smad/control.sock").exists() or process.poll() is None:
             raise RuntimeError("plugin helper launched a browser while the browser was stopped")
         stopped_growth = sum(
             "\tselect-project\t" in line or "\tclose-project\t" in line
@@ -1106,7 +1106,7 @@ def main() -> int:
         before_restart = state(ctl, env)
         (evidence / "state-before-restart.json").write_text(json.dumps(before_restart, indent=2) + "\n")
         process.terminate(); process.wait(timeout=15)
-        (runtime / "lavish-browser/control.sock").unlink(missing_ok=True)
+        (runtime / "smad/control.sock").unlink(missing_ok=True)
         process = start_browser()
 
         def restored_snapshot():

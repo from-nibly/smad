@@ -3,7 +3,7 @@ name: release
 on:
   push:
     tags:
-      - "*"
+      - "v*"
 
 permissions:
   contents: write
@@ -14,61 +14,54 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install GTK and WebKitGTK build dependencies
+      - name: Install native build and test dependencies
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
-            libgtk-4-dev \
-            libwebkitgtk-6.0-dev \
-            pkg-config
+            libgtk-4-dev libwebkitgtk-6.0-dev librsvg2-common \
+            pkg-config xvfb dbus python3
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.95.0
           targets: wasm32-wasip1
+          components: clippy, rustfmt
 
-      - name: Test workspace
-        run: cargo test --locked --workspace
+      - name: Verify workspace and native renderers
+        env:
+          TMPDIR: /tmp
+        run: |
+          cargo fetch --locked
+          ./scripts/check.sh
+          python3 tests/e2e/native_markdown.py
 
       - name: Build release artifacts
         run: |
-          cargo build --locked --release -p lavish-browser -p lavish-browser-cli
-          cargo build --locked --release -p lavish-browser-zellij --target wasm32-wasip1
+          cargo build --locked --release -p smad -p smad-cli
+          cargo build --locked --release -p smad-zellij --target wasm32-wasip1
+          test "$(target/release/smad --version)" = "smad ${GITHUB_REF_NAME#v}"
+          target/release/smad-axi --version --json
 
-      - name: Package release
+      - name: Package server, AXI, integrations and notices
         run: |
-          package="$RUNNER_TEMP/lavish-browser"
-          mkdir -p \
-            "$package/bin" \
-            "$package/share/applications" \
-            "$package/share/icons/hicolor/scalable/apps" \
-            "$package/share/lavish-browser/zellij"
-          install -m 0755 target/release/lavish-browser "$package/bin/"
-          install -m 0755 target/release/lavish-open "$package/bin/"
-          install -m 0755 target/release/lavish-browser-ctl "$package/bin/"
-          install -m 0755 target/release/lavish-browser-herdr-sync "$package/bin/"
-          install -m 0644 \
-            target/wasm32-wasip1/release/lavish_browser_zellij.wasm \
-            "$package/share/lavish-browser/zellij/lavish-browser-zellij.wasm"
-          install -m 0644 assets/works.from-nibly.LavishBrowser.desktop \
-            "$package/share/applications/"
-          install -m 0644 assets/works.from-nibly.LavishBrowser.svg \
-            "$package/share/icons/hicolor/scalable/apps/"
-          tar -C "$RUNNER_TEMP" -czf lavish-browser-x86_64-linux.tar.gz lavish-browser
-          sha256sum lavish-browser-x86_64-linux.tar.gz > SHA256SUMS
+          ./packaging/install.sh --no-build --prefix "$RUNNER_TEMP/smad"
+          tar -C "$RUNNER_TEMP" -czf smad-x86_64-linux.tar.gz smad
+          cp target/release/smad smad-server-x86_64-linux
+          cp target/release/smad-axi smad-axi-x86_64-linux
+          # Standalone downloads must carry the same attribution/source bundle.
+          tar -C "$RUNNER_TEMP/smad/share/smad" -czf smad-third-party-notices.tar.gz licenses
+          sha256sum smad-x86_64-linux.tar.gz smad-server-x86_64-linux \
+            smad-axi-x86_64-linux smad-third-party-notices.tar.gz > SHA256SUMS
 
-      - name: Create GitHub release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          assets=(smad-x86_64-linux.tar.gz smad-server-x86_64-linux smad-axi-x86_64-linux smad-third-party-notices.tar.gz SHA256SUMS)
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" \
-              lavish-browser-x86_64-linux.tar.gz SHA256SUMS --clobber
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" \
-              lavish-browser-x86_64-linux.tar.gz SHA256SUMS \
-              --verify-tag \
-              --generate-notes \
-              --title "$GITHUB_REF_NAME"
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+              --verify-tag --notes-file "docs/releases/$GITHUB_REF_NAME.md" --title "SMAD $GITHUB_REF_NAME"
           fi

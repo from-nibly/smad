@@ -11,6 +11,7 @@ use webkit6::prelude::*;
 pub enum DocumentEvent {
     Loading,
     Ready(Option<String>),
+    ReadyWithWarnings(Option<String>, String),
     Failed(String),
 }
 
@@ -293,7 +294,7 @@ impl DocumentView {
         toolbar.append(&status);
 
         #[cfg(debug_assertions)]
-        if std::env::var_os("LAVISH_BROWSER_INSPECTOR").is_some() {
+        if std::env::var_os("SMAD_INSPECTOR").is_some() {
             if let Some(settings) = webkit6::prelude::WebViewExt::settings(&webview) {
                 settings.set_enable_developer_extras(true);
             }
@@ -415,10 +416,13 @@ impl DocumentView {
                                 .finished(response_status, title.clone(), &uri)
                         {
                             match &event {
-                                DocumentEvent::Ready(_) => status.set_text(&format!(
-                                    "Loaded: {}",
-                                    title.as_deref().unwrap_or("untitled Lavish session")
-                                )),
+                                DocumentEvent::Ready(_)
+                                | DocumentEvent::ReadyWithWarnings(_, _) => {
+                                    status.set_text(&format!(
+                                        "Loaded: {}",
+                                        title.as_deref().unwrap_or("untitled Lavish session")
+                                    ))
+                                }
                                 DocumentEvent::Failed(message) => {
                                     status.set_text(
                                         "Reconnect required: no successful HTTP response",
@@ -643,7 +647,7 @@ pub fn configure_automation_from_environment() {
         && let Some(context) = webkit6::WebContext::default()
     {
         context.set_automation_allowed(true);
-        eprintln!("WebKit automation enabled for this Lavish Browser process");
+        eprintln!("WebKit automation enabled for this SMAD process");
     }
 }
 
@@ -659,7 +663,7 @@ pub fn configure_automation_session(
     context.connect_automation_started(move |_, session| {
         eprintln!("WebKit automation session started");
         let info = webkit6::ApplicationInfo::new();
-        info.set_name("Lavish Browser");
+        info.set_name("SMAD");
         info.set_version(0, 1, 0);
         session.set_application_info(&info);
 
@@ -675,7 +679,7 @@ pub fn configure_automation_session(
 }
 
 fn automation_enabled() -> bool {
-    std::env::var("LAVISH_BROWSER_AUTOMATION")
+    std::env::var("SMAD_AUTOMATION")
         .is_ok_and(|value| matches!(value.as_str(), "1" | "true" | "yes"))
 }
 

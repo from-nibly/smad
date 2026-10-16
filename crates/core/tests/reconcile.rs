@@ -1,9 +1,9 @@
-use lavish_browser_core::reconcile::{
+use smad_core::reconcile::{
     CommandOutput, CommandRunner, LiveZellijState, ZellijCommandState, ZellijStateSource,
     reconcile_from_source, reconcile_model, reconcile_model_preserving_runtime,
 };
-use lavish_browser_core::{BrowserModel, DocumentKey, DocumentLifecycle, ProjectKey};
-use lavish_browser_protocol::ProjectMetadata;
+use smad_core::{BrowserModel, DocumentKey, DocumentLifecycle, ProjectKey};
+use smad_protocol::ProjectMetadata;
 use std::collections::{HashSet, VecDeque};
 use std::io;
 use std::sync::Mutex;

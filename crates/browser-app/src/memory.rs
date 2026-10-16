@@ -1,4 +1,4 @@
-use lavish_browser_core::{BrowserModel, DocumentKey};
+use smad_core::{BrowserModel, DocumentKey};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum WarningLevel {
@@ -64,8 +64,8 @@ pub(crate) fn suspension_candidates(
 #[cfg(test)]
 mod tests {
     use super::{MaterializationPlan, WarningLevel, materialization_plan, suspension_candidates};
-    use lavish_browser_core::{BrowserModel, DocumentKey};
-    use lavish_browser_protocol::{ProjectKey, ProjectMetadata};
+    use smad_core::{BrowserModel, DocumentKey};
+    use smad_protocol::{ProjectKey, ProjectMetadata};
     use std::collections::HashSet;
 
     fn project(tab: u32) -> ProjectMetadata {

@@ -1,4 +1,4 @@
-use lavish_browser_protocol::*;
+use smad_protocol::*;
 
 fn open_request() -> RequestEnvelope {
     RequestEnvelope::new(
@@ -95,6 +95,7 @@ fn response_and_read_only_inspection_round_trip() {
         error_code: None,
         message: None,
         state: Some(BrowserStateSnapshot {
+            version: Some("0.3.0".into()),
             projects: vec![],
             selected_project: None,
             presentation_count: 0,

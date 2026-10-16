@@ -58,6 +58,12 @@ pub enum Command {
         source_file: String,
         url: String,
     },
+    OpenMarkdown {
+        project: ProjectMetadata,
+        source_file: String,
+        #[serde(default)]
+        fragment: Option<String>,
+    },
     SelectProject {
         session_name: String,
         stable_tab_id: u32,
@@ -109,6 +115,8 @@ pub struct ResponseEnvelope {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BrowserStateSnapshot {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
     pub projects: Vec<ProjectSnapshot>,
     pub selected_project: Option<ProjectKey>,
     pub presentation_count: u64,
@@ -125,12 +133,24 @@ pub struct ProjectSnapshot {
     pub documents: Vec<DocumentSnapshot>,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DocumentKind {
+    #[default]
+    LavishReview,
+    Markdown,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DocumentSnapshot {
+    #[serde(default)]
+    pub kind: DocumentKind,
     pub source_file: String,
     pub url: String,
     pub title: Option<String>,
     pub lifecycle: DocumentLifecycleSnapshot,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diagnostic: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

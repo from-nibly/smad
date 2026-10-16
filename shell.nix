@@ -44,4 +44,6 @@ pkgs.mkShell {
   # WebKitWebDriver is supplied by webkitgtk_6_0. Xvfb, AT-SPI/Dogtail,
   # Selenium, and wmctrl support later headless native/browser E2E runs.
   WEBKIT_WEBDRIVER = "${pkgs.webkitgtk_6_0}/bin/WebKitWebDriver";
+  # Isolated Xvfb tests need this shell's Mesa rather than inherited host/nixGL drivers.
+  LAVISH_TEST_MESA = "${pkgs.mesa}";
 }

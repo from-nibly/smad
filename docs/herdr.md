@@ -11,10 +11,10 @@ A launch is assigned to exactly that HerdR tab, even if another tab becomes visi
 
 ## Lifecycle helper
 
-Run one helper for each named HerdR session whose visible tabs should control Lavish Browser:
+Run one helper for each named HerdR session whose visible tabs should control SMAD:
 
 ```bash
-lavish-browser-herdr-sync --session main
+smad-herdr-sync --session main
 ```
 
 The helper connects to HerdR's user-owned Unix socket, reads the initial session snapshot, and subscribes to workspace/tab focus and closure events. It provides one-way synchronization:
@@ -27,16 +27,16 @@ The helper connects to HerdR's user-owned Unix socket, reads the initial session
 
 Tab labels are refreshed on startup/reconnect and focus as well as rename events, so missed renames are recovered. Empty labels display the stable tab ID. Identity, document state, selection, and LRU timestamps are preserved; duplicate names remain distinct projects. Labels are one-way: changing a HerdR tab never changes its stable project key.
 
-Focus and rename events do not start or raise Lavish Browser. The helper reconnects after a HerdR server restart. Use `--socket PATH` for a nonstandard or test socket and `--once` to synchronize only the current snapshot.
+Focus and rename events do not start or raise SMAD. The helper reconnects after a HerdR server restart. Use `--socket PATH` for a nonstandard or test socket and `--once` to synchronize only the current snapshot.
 
 A typical systemd user service is:
 
 ```ini
 [Unit]
-Description=Synchronize HerdR tabs with Lavish Browser
+Description=Synchronize HerdR tabs with SMAD
 
 [Service]
-ExecStart=%h/.local/bin/lavish-browser-herdr-sync --session main
+ExecStart=%h/.local/bin/smad-herdr-sync --session main
 Restart=on-failure
 RestartSec=1
 

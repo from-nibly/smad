@@ -1,8 +1,8 @@
-use lavish_browser_cli::{
+use smad_cli::{
     LavishSession, parse_lavish_toon, project_from_herdr_tabs, project_from_panes,
     upstream_arguments,
 };
-use lavish_browser_protocol::ProjectKey;
+use smad_protocol::ProjectKey;
 
 #[test]
 fn parses_current_toon_and_rejects_malformed_or_remote_output() {

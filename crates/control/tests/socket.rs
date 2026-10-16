@@ -1,5 +1,5 @@
-use lavish_browser_control::{BrowserControl, ControlError, SocketClient, SocketServer};
-use lavish_browser_protocol::{
+use smad_control::{BrowserControl, ControlError, SocketClient, SocketServer};
+use smad_protocol::{
     Command, MAX_MESSAGE_BYTES, PROTOCOL_VERSION, RequestEnvelope, ResponseEnvelope, ResponseStatus,
 };
 use std::fs;
