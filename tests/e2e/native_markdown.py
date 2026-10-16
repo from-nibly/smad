@@ -41,6 +41,8 @@ def request(path, command):
         client.connect(path)
         client.sendall(json.dumps({"protocol_version": 2, "request_id": "markdown-poc", "command": command}).encode() + b"\n")
         response = client.makefile("rb").readline()
+    if not response:
+        raise RuntimeError("Server closed the control connection before replying; see application.log below")
     value = json.loads(response)
     if value["status"] == "error":
         raise RuntimeError(value)
@@ -126,8 +128,10 @@ def application_smoke(env, temporary):
                 server.server_close()
                 thread.join(timeout=5)
         finally:
-            app.terminate()
+            if app.poll() is None:
+                app.terminate()
             app.wait(timeout=10)
+            print("Application log (tail):\n" + (EVIDENCE / "application.log").read_text()[-16000:], flush=True)
 
 
 with tempfile.TemporaryDirectory(prefix="lavish-markdown-test-") as temporary:

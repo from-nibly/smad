@@ -1,6 +1,7 @@
 name: release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "v*"
@@ -40,7 +41,9 @@ jobs:
         run: |
           cargo build --locked --release -p smad -p smad-cli
           cargo build --locked --release -p smad-zellij --target wasm32-wasip1
-          test "$(target/release/smad --version)" = "smad ${GITHUB_REF_NAME#v}"
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')
+          test "$(target/release/smad --version)" = "smad $version"
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then test "$GITHUB_REF_NAME" = "v$version"; fi
           target/release/smad-axi --version --json
 
       - name: Package server, AXI, integrations and notices
@@ -55,6 +58,7 @@ jobs:
             smad-axi-x86_64-linux smad-third-party-notices.tar.gz > SHA256SUMS
 
       - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
