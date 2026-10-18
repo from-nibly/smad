@@ -95,6 +95,7 @@ fn response_and_read_only_inspection_round_trip() {
         error_code: None,
         message: None,
         state: Some(BrowserStateSnapshot {
+            capabilities: Vec::new(),
             version: Some("0.3.0".into()),
             projects: vec![],
             selected_project: None,

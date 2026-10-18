@@ -11,3 +11,6 @@ serde_json.workspace = true
 url.workspace = true
 percent-encoding = "2.3"
 libc = "0.2"
+tempfile = "3.27"
+imara-diff = { version = "=0.2.0", default-features = false }
+sha2 = "0.10"

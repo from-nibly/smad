@@ -5,6 +5,8 @@ use smad_protocol::{DocumentKind, ProjectKey, ProjectMetadata};
 pub struct DocumentKey {
     pub project: ProjectKey,
     pub canonical_source_file: String,
+    #[serde(default)]
+    pub kind: DocumentKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,6 +28,14 @@ pub struct Document {
     pub lifecycle: DocumentLifecycle,
     pub last_activated_at: u64,
     pub load_error: Option<String>,
+    #[serde(skip)]
+    pub open_request_id: Option<String>,
+    #[serde(default)]
+    pub highlights: Vec<smad_protocol::LineRange>,
+    #[serde(default)]
+    pub old_highlights: Vec<smad_protocol::LineRange>,
+    #[serde(default)]
+    pub comparison: Option<crate::snapshots::ComparisonSpec>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,8 +45,19 @@ pub struct Project {
     pub raw_tab_name: Option<String>,
     pub documents: Vec<Document>,
     pub selected_document: Option<String>,
+    #[serde(default)]
+    pub selected_kind: DocumentKind,
     pub created_at: u64,
     pub updated_at: u64,
+}
+
+impl Project {
+    pub fn selected(&self) -> Option<&Document> {
+        self.documents.iter().find(|document| {
+            Some(&document.key.canonical_source_file) == self.selected_document.as_ref()
+                && document.kind == self.selected_kind
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -85,7 +106,7 @@ impl BrowserModel {
         )
     }
 
-    fn open_document(
+    pub fn open_document(
         &mut self,
         project: ProjectMetadata,
         source: String,
@@ -120,6 +141,7 @@ impl BrowserModel {
                 raw_tab_name: project.raw_tab_name.clone(),
                 documents: Vec::new(),
                 selected_document: None,
+                selected_kind: kind,
                 created_at: activated_at,
                 updated_at: activated_at,
             });
@@ -130,10 +152,9 @@ impl BrowserModel {
         target.label = project.label;
         target.raw_tab_name = project.raw_tab_name;
         target.updated_at = activated_at;
-        let document_index = target
-            .documents
-            .iter()
-            .position(|document| document.key.canonical_source_file == source);
+        let document_index = target.documents.iter().position(|document| {
+            document.key.canonical_source_file == source && document.kind == kind
+        });
         let document_created = document_index.is_none();
         if let Some(index) = document_index {
             target.documents[index].last_activated_at = activated_at;
@@ -142,6 +163,7 @@ impl BrowserModel {
                 key: DocumentKey {
                     project: target.key.clone(),
                     canonical_source_file: source.clone(),
+                    kind,
                 },
                 kind,
                 lavish_url: url,
@@ -149,9 +171,14 @@ impl BrowserModel {
                 lifecycle: DocumentLifecycle::Dormant,
                 last_activated_at: activated_at,
                 load_error: None,
+                open_request_id: None,
+                highlights: Vec::new(),
+                old_highlights: Vec::new(),
+                comparison: None,
             });
         }
         target.selected_document = Some(source);
+        target.selected_kind = kind;
         self.selected_project = Some(target.key.clone());
 
         OpenOutcome {
@@ -167,10 +194,10 @@ impl BrowserModel {
         };
         project.updated_at = activated_at;
         if let Some(source) = &project.selected_document
-            && let Some(document) = project
-                .documents
-                .iter_mut()
-                .find(|document| &document.key.canonical_source_file == source)
+            && let Some(document) = project.documents.iter_mut().find(|document| {
+                &document.key.canonical_source_file == source
+                    && document.kind == project.selected_kind
+            })
         {
             document.last_activated_at = activated_at;
         }
@@ -229,6 +256,7 @@ impl BrowserModel {
         document.last_activated_at = activated_at;
         project.updated_at = activated_at;
         project.selected_document = Some(key.canonical_source_file.clone());
+        project.selected_kind = key.kind;
         self.selected_project = Some(key.project.clone());
         true
     }
@@ -248,7 +276,8 @@ impl BrowserModel {
         else {
             return false;
         };
-        let was_selected = project.selected_document.as_deref() == Some(&key.canonical_source_file);
+        let was_selected = project.selected_document.as_deref() == Some(&key.canonical_source_file)
+            && project.selected_kind == key.kind;
         project.documents.remove(index);
         if was_selected {
             project.selected_document = project
@@ -259,7 +288,10 @@ impl BrowserModel {
                         .checked_sub(1)
                         .and_then(|prior| project.documents.get(prior))
                 })
-                .map(|document| document.key.canonical_source_file.clone());
+                .map(|document| {
+                    project.selected_kind = document.kind;
+                    document.key.canonical_source_file.clone()
+                });
         }
         true
     }
@@ -295,6 +327,7 @@ impl BrowserModel {
                         .map(|source| DocumentKey {
                             project: project.key.clone(),
                             canonical_source_file: source.clone(),
+                            kind: project.selected_kind,
                         })
                 })
         });

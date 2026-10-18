@@ -1,4 +1,6 @@
 //! Agent-facing commands over the existing single-instance document server.
+#[path = "axi_compare.rs"]
+mod compare;
 use crate::{
     ProcessRunner, SystemRunner, ensure_browser, parse_lavish_toon, request, resolve_project,
     upstream_arguments,
@@ -12,8 +14,7 @@ use smad_protocol::{
 use std::time::{Duration, Instant};
 
 const DESCRIPTION: &str = "Show Me Agent Document: open explicitly typed local documents in a persistent native desktop reader.";
-const OPEN_HELP: &str =
-    "smad-axi open <md://file.md|lavish://file.html> [--reopen] [--timeout-ms 30000] [--json]";
+const OPEN_HELP: &str = "smad-axi open <code://file|md://file.md|lavish://file.html> [--reopen] [--timeout-ms 30000] [--json]";
 
 struct Failure {
     code: &'static str,
@@ -85,7 +86,9 @@ fn execute(args: &[String]) -> Result<Value> {
         && flag == "--help"
     {
         return match command.as_str() {
-            "open" | "status" | "documents" | "schemes" | "setup" => Ok(help(Some(command))),
+            "open" | "compare" | "status" | "documents" | "schemes" | "setup" => {
+                Ok(help(Some(command)))
+            }
             _ => Err(Failure::usage(format!("unknown command: {command}"))),
         };
     }
@@ -99,8 +102,10 @@ fn execute(args: &[String]) -> Result<Value> {
             dashboard(args.len() == 2)
         }
         "open" => open(&args[1..]),
+        "compare" => compare::run(&args[1..]),
         "schemes" if args.len() == 1 => Ok(json!({
             "schemes": [
+                {"scheme": "code://", "renderer": "native GTK source", "target": "whole local UTF-8 file; optional ?highlight=12-24,48 (1-based inclusive source lines)"},
                 {"scheme": "md://", "renderer": "native GTK Markdown", "target": "local .md/.markdown file; optional #heading"},
                 {"scheme": "lavish://", "renderer": "upstream Lavish + WebKit", "target": "local .html/.htm artifact"}
             ],
@@ -123,7 +128,10 @@ fn execute(args: &[String]) -> Result<Value> {
 fn help(command: Option<&str>) -> Value {
     match command {
         Some("open") => {
-            json!({"usage": OPEN_HELP, "behavior": "Capture invoking project; reuse/start SMAD; open via explicit renderer; verify the target reaches Ready. --reopen only reopens user-ended Lavish sessions when explicitly requested.", "examples": ["smad-axi open md://./README.md", "smad-axi open 'md:///tmp/a%20file.md#heading'", "smad-axi open lavish://./review.html"], "help": ["smad-axi schemes"]})
+            json!({"usage": OPEN_HELP, "behavior": "Capture invoking project; reuse/start SMAD; open via explicit renderer; verify the target reaches Ready. --reopen only reopens user-ended Lavish sessions when explicitly requested.", "coordinates": "code:// accepts ?highlight=12-24,48 using original 1-based inclusive source lines; no highlight query for Markdown yet", "examples": ["smad-axi open 'code://./src/main.rs?highlight=12-24,48'", "smad-axi open md://./README.md", "smad-axi open 'md:///tmp/a%20file.md#heading'", "smad-axi open lavish://./review.html"], "help": ["smad-axi schemes"]})
+        }
+        Some("compare") => {
+            json!({"usage": compare::HELP, "behavior": "Whole-file unified comparison, including all unchanged context. Exact --base by default; --merge-base requires --head and resolves a single merge base once. Working-tree after is live; the base stays fixed. --old/--new capture immutable files; /dev/null explicitly denotes an absent side. --highlight uses new-side source lines; --highlight-old uses old-side lines. No diff:// scheme and no patch application.", "examples": ["smad-axi compare ./src/main.rs --base HEAD --highlight 12-24,48", "smad-axi compare ./src/main.rs --base main --head feature --merge-base", "smad-axi compare --old ./before.rs --new ./after.rs"]})
         }
         Some("status" | "documents") => {
             json!({"usage": "smad-axi status|documents [--full] [--json]", "behavior": "Read-only. At most 20 document rows by default; --full includes every row without path truncation. Never starts or raises the server.", "help": [OPEN_HELP]})
@@ -135,7 +143,7 @@ fn help(command: Option<&str>) -> Value {
             json!({"usage": "smad-axi schemes [--json]", "behavior": "Describe the explicit local-file renderer schemes."})
         }
         _ => {
-            json!({"usage": "smad-axi <command> [args] [flags]", "description": DESCRIPTION, "commands": [OPEN_HELP, "status [--full] [--json]", "documents [--full] [--json]", "schemes [--json]", "setup hooks", "--version"], "no_arguments": "Show current server/document state without starting anything", "environment": {"SMAD_SOCKET": "Override the same-user Unix control socket", "SMAD_EXECUTABLE": "Override server executable; default is sibling smad, then PATH", "XDG_STATE_HOME": "Persistent state root (smad/state.json); legacy metadata is read only when new state is absent"}})
+            json!({"usage": "smad-axi <command> [args] [flags]", "description": DESCRIPTION, "commands": [OPEN_HELP, compare::HELP, "status [--full] [--json]", "documents [--full] [--json]", "schemes [--json]", "setup hooks", "--version"], "no_arguments": "Show current server/document state without starting anything", "environment": {"SMAD_SOCKET": "Override the same-user Unix control socket", "SMAD_EXECUTABLE": "Override server executable; default is sibling smad, then PATH", "XDG_STATE_HOME": "Persistent state root (smad/state.json); legacy metadata is read only when new state is absent"}})
         }
     }
 }
@@ -198,6 +206,8 @@ fn renderer(kind: DocumentKind) -> &'static str {
     match kind {
         DocumentKind::Markdown => "markdown",
         DocumentKind::LavishReview => "lavish",
+        DocumentKind::Code => "code",
+        DocumentKind::Comparison => "comparison",
     }
 }
 
@@ -243,6 +253,12 @@ fn open(args: &[String]) -> Result<Value> {
         resolve_project(&SystemRunner).map_err(|e| Failure::runtime("PROJECT_CONTEXT", e))?;
     let source_file = document.path.to_str().expect("validated UTF-8").to_owned();
     let command = match document.kind {
+        DocumentKind::Code => Command::OpenCode {
+            project: project.clone(),
+            source_file: source_file.clone(),
+            highlights: document.highlights.clone(),
+        },
+        DocumentKind::Comparison => return Err(Failure::usage("use smad-axi compare")),
         DocumentKind::Markdown => Command::OpenMarkdown {
             project: project.clone(),
             source_file: source_file.clone(),
@@ -294,6 +310,24 @@ fn open(args: &[String]) -> Result<Value> {
             }
         }
     };
+    open_command(
+        command,
+        project,
+        source_file,
+        document.kind,
+        Some(document.canonical_uri()),
+        timeout,
+    )
+}
+
+fn open_command(
+    command: Command,
+    project: smad_protocol::ProjectMetadata,
+    source_file: String,
+    kind: DocumentKind,
+    uri: Option<String>,
+    timeout: Duration,
+) -> Result<Value> {
     let control = client();
     ensure_browser(&control).map_err(|e| Failure::runtime("SERVER_START_FAILED", e))?;
     let server = inspect(&control)?
@@ -308,8 +342,20 @@ fn open(args: &[String]) -> Result<Value> {
             "socket belongs to a legacy/different application; run the matching SMAD server",
         ));
     }
+    if matches!(kind, DocumentKind::Code | DocumentKind::Comparison)
+        && !server
+            .capabilities
+            .iter()
+            .any(|capability| capability == "source_documents_v1")
+    {
+        return Err(Failure::runtime(
+            "INCOMPATIBLE_SERVER",
+            "running SMAD does not support native source documents; upgrade/restart it before opening code or comparisons",
+        ));
+    }
+    let envelope = request(command);
     let response = control
-        .request(&request(command))
+        .request(&envelope)
         .map_err(|e| Failure::runtime("OPEN_REJECTED", e.to_string()))?;
     if response.status != ResponseStatus::Ok {
         return Err(Failure::runtime(
@@ -329,11 +375,19 @@ fn open(args: &[String]) -> Result<Value> {
             .and_then(|p| {
                 p.documents
                     .iter()
-                    .find(|d| d.source_file == source_file && d.kind == document.kind)
+                    .find(|d| d.source_file == source_file && d.kind == kind)
             });
         if let Some(target) = target {
+            if matches!(kind, DocumentKind::Code | DocumentKind::Comparison)
+                && target.open_request_id.as_deref() != Some(&envelope.request_id)
+            {
+                return Err(Failure::runtime(
+                    "OPEN_SUPERSEDED",
+                    "another action replaced or cleared this document request; inspect current state rather than assuming these ranges/inputs are still displayed",
+                ));
+            }
             match target.lifecycle {
-                DocumentLifecycleSnapshot::Ready => return Ok(json!({"document": {"uri": document.canonical_uri(), "renderer": renderer(document.kind), "state": if target.diagnostic.is_some() { "ready_with_warnings" } else { "ready" }, "project": project.label}, "warnings": target.diagnostic.iter().collect::<Vec<_>>(), "server_pid": state.process_id, "help": ["smad-axi documents", if document.kind == DocumentKind::Markdown { "Edit the file on disk to live-update the native document. Relative Markdown links stay native." } else { "Use lavish-axi poll/reply/export for the upstream review workflow." }]})),
+                DocumentLifecycleSnapshot::Ready => return Ok(json!({"document": {"uri": uri, "file": source_file, "renderer": renderer(kind), "state": if target.diagnostic.is_some() { "ready_with_warnings" } else { "ready" }, "project": project.label}, "warnings": target.diagnostic.iter().collect::<Vec<_>>(), "server_pid": state.process_id, "help": ["smad-axi documents", if kind == DocumentKind::LavishReview { "Use lavish-axi poll/reply/export for the upstream review workflow." } else { "Native read-only document. Source ranges use original 1-based lines, not wrapped/display rows." }]})),
                 DocumentLifecycleSnapshot::Failed => return Err(Failure::runtime("DOCUMENT_FAILED", target.diagnostic.clone().unwrap_or_else(|| "Document opened but failed to load; inspect its visible diagnostic and the SMAD server log".into()))),
                 _ => {}
             }
@@ -366,7 +420,7 @@ mod tests {
     #[test]
     fn help_and_schemes_are_bounded_machine_readable_data() {
         let value = execute(&["schemes".into()]).unwrap_or_else(|_| panic!("schemes"));
-        assert_eq!(value["schemes"].as_array().unwrap().len(), 2);
+        assert_eq!(value["schemes"].as_array().unwrap().len(), 3);
         let encoded = toon_format::encode_default(&value).unwrap();
         assert_eq!(
             toon_format::decode_default::<Value>(&encoded).unwrap(),

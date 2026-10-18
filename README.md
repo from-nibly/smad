@@ -6,12 +6,18 @@ GTK window groups documents by the invoking HerdR or Zellij project. `smad-axi` 
 **The URI scheme chooses the renderer:**
 
 ```zsh
+smad-axi open 'code://./src/main.rs?highlight=12-24,48'
+smad-axi compare ./src/main.rs --base HEAD
 smad-axi open md://./README.md
 smad-axi open 'md:///absolute/path/to/plan.md#next-steps'
 smad-axi open lavish://./review.html
 smad-axi status
 ```
 
+- **`code://`** — whole-file native source with syntax highlighting, line numbers and
+  agent-selected source ranges. **`smad-axi compare`** shows full before/after context,
+  old/new numbering and changed blocks, with immutable snapshots or a live working-tree after.
+  No `diff://` scheme. See [source/comparison semantics and limits](docs/native-source.md).
 - **`md://`** — native GTK Markdown: syntax-highlighted code, native Mermaid SVG, rich aligned
   tables, selectable text, local images, relative document links, and debounced live disk updates.
 - **`lavish://`** — unchanged upstream [Lavish](https://github.com/kunchenguid/lavish-axi) review
@@ -40,10 +46,12 @@ is checked for the exact project/file opened, not whichever document happens to 
 
 Paths after `://` are **local paths**, not network authorities. Relative paths resolve from the
 invoking directory. Percent-encode literal `#` and `?` in filenames; Markdown supports a heading
-fragment. Only `.md`/`.markdown` and `.html`/`.htm` files are accepted by their respective schemes.
+fragment. Code accepts UTF-8 regular files with an optional `highlight` query. Only
+`.md`/`.markdown` and `.html`/`.htm` files are accepted by their respective schemes.
+Markdown source-line highlight queries are not yet implemented and are rejected explicitly.
 
 Opening captures the invoking HerdR session/workspace/tab IDs or Zellij session/stable tab ID.
-Display labels never become identity. Opening the same file in one project reuses its view;
+Display labels never become identity. Opening the same file/renderer in one project reuses its document entry;
 different projects can retain separate views. Outside either runtime, documents use Standalone.
 
 An installable [agent skill](skills/smad/SKILL.md) ships in `share/smad/skills/smad/`.
@@ -62,7 +70,8 @@ Runtime requirements:
 
 - Linux x86-64 with GTK 4.10+ and WebKitGTK 6; published binaries target Ubuntu 24.04's ABI.
 - Native SVG image loader (for example `librsvg2-common` on Ubuntu/Pop!_OS).
-- `npx`/`lavish-axi` only for `lavish://` review sessions—not for native Markdown.
+- `npx`/`lavish-axi` only for `lavish://` review sessions—not for native renderers.
+- Git only for revision comparisons; file snapshots and code views do not require it.
 - HerdR or Zellij only for contextual grouping and optional lifecycle synchronization.
 
 On NixOS, package/patchelf the native release against Nix GTK/WebKit as before. On Pop!_OS,

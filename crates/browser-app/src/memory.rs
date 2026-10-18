@@ -81,6 +81,7 @@ mod tests {
 
     fn key(tab: u32, source: &str) -> DocumentKey {
         DocumentKey {
+            kind: smad_protocol::DocumentKind::LavishReview,
             project: ProjectKey::Zellij {
                 session_name: "main".into(),
                 stable_tab_id: tab,

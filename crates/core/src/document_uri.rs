@@ -7,33 +7,55 @@ pub struct DocumentUri {
     pub kind: DocumentKind,
     pub path: PathBuf,
     pub fragment: Option<String>,
+    pub highlights: Vec<smad_protocol::LineRange>,
 }
 
 impl DocumentUri {
     pub fn parse(value: &str, cwd: &Path) -> Result<Self, String> {
         let (scheme, target) = value.split_once("://").ok_or(
-            "use md://<file.md> or lavish://<file.html>; an explicit renderer scheme is required",
+            "use code://<file>, md://<file.md> or lavish://<file.html>; an explicit renderer scheme is required",
         )?;
         let kind = match scheme.to_ascii_lowercase().as_str() {
             "md" => DocumentKind::Markdown,
+            "code" => DocumentKind::Code,
             "lavish" => DocumentKind::LavishReview,
-            _ => return Err("unsupported document scheme; use md:// or lavish://".into()),
+            _ => return Err("unsupported document scheme; use code://, md:// or lavish:// (comparisons use smad-axi compare)".into()),
         };
         let (path, fragment) = target
             .split_once('#')
             .map_or((target, None), |(path, fragment)| {
                 (path, Some(fragment.to_owned()))
             });
-        if path.is_empty() || path.contains('?') {
-            return Err("expected a local file path, without a query; percent-encode literal ? and # in filenames".into());
+        let (path, query) = path
+            .split_once('?')
+            .map_or((path, None), |(path, query)| (path, Some(query)));
+        if path.is_empty() {
+            return Err(
+                "expected a local file path; percent-encode literal ? and # in filenames".into(),
+            );
         }
+        let highlights = if let Some(query) = query {
+            if kind != DocumentKind::Code {
+                return Err("source-line highlight queries currently require code://; Markdown source mapping is not implemented".into());
+            }
+            let value = query
+                .strip_prefix("highlight=")
+                .filter(|value| !value.contains('&'))
+                .ok_or("only one highlight= query parameter is supported")?;
+            let decoded = percent_encoding::percent_decode_str(value)
+                .decode_utf8()
+                .map_err(|_| "invalid UTF-8 highlight query")?;
+            smad_protocol::parse_ranges(&decoded)?
+        } else {
+            Vec::new()
+        };
         if fragment
             .as_ref()
             .is_some_and(|fragment| fragment.len() > 512)
         {
             return Err("heading fragment exceeds 512 bytes".into());
         }
-        if kind == DocumentKind::LavishReview && fragment.is_some() {
+        if kind != DocumentKind::Markdown && fragment.is_some() {
             return Err("heading fragments are supported only for md:// documents".into());
         }
         for (index, byte) in path.bytes().enumerate() {
@@ -62,6 +84,10 @@ impl DocumentUri {
         };
         let path = match kind {
             DocumentKind::Markdown => crate::markdown::canonical_markdown(&path)?,
+            DocumentKind::Code => crate::source::canonical_source(&path)?,
+            DocumentKind::Comparison => {
+                return Err("use smad-axi compare for full-file comparisons".into());
+            }
             DocumentKind::LavishReview => {
                 let path = path.canonicalize().map_err(|e| e.to_string())?;
                 if !path.is_file()
@@ -81,15 +107,24 @@ impl DocumentUri {
             kind,
             path,
             fragment,
+            highlights,
         })
     }
 
     pub fn canonical_uri(&self) -> String {
         let mut url = url::Url::from_file_path(&self.path).expect("canonical absolute path");
         url.set_fragment(self.fragment.as_deref());
+        if !self.highlights.is_empty() {
+            url.set_query(Some(&format!(
+                "highlight={}",
+                smad_protocol::format_ranges(&self.highlights)
+            )));
+        }
         let scheme = match self.kind {
             DocumentKind::Markdown => "md",
             DocumentKind::LavishReview => "lavish",
+            DocumentKind::Code => "code",
+            DocumentKind::Comparison => unreachable!("comparisons have no URI scheme"),
         };
         format!(
             "{scheme}://{}",

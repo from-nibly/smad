@@ -19,6 +19,7 @@ fn key(tab: u32) -> ProjectKey {
 fn document(tab: u32, source: &str) -> DocumentKey {
     DocumentKey {
         project: key(tab),
+        kind: smad_protocol::DocumentKind::LavishReview,
         canonical_source_file: source.into(),
     }
 }

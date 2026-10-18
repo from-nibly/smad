@@ -54,6 +54,7 @@ fn populated_model() -> BrowserModel {
     model.set_document_lifecycle(
         &DocumentKey {
             project: zellij,
+            kind: smad_protocol::DocumentKind::LavishReview,
             canonical_source_file: "/tmp/report.html".into(),
         },
         DocumentLifecycle::Failed,

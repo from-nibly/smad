@@ -79,11 +79,13 @@ fn lavish_scheme_preserves_upstream_no_open_and_routes_review() {
         {
             assert_eq!(url, "http://127.0.0.1:4387/session/axi-test");
             *captured.lock().unwrap() = Some(ProjectSnapshot {
+                selected_kind: DocumentKind::LavishReview,
                 key: project.key.clone(),
                 label: project.label.clone(),
                 selected_source_file: Some(source_file.clone()),
                 documents: vec![DocumentSnapshot {
                     kind: DocumentKind::LavishReview,
+                    open_request_id: None,
                     source_file: source_file.clone(),
                     url: url.clone(),
                     title: Some("Review".into()),
@@ -99,6 +101,7 @@ fn lavish_scheme_preserves_upstream_no_open_and_routes_review() {
             error_code: None,
             message: None,
             state: matches!(request.command, Command::InspectState).then(|| BrowserStateSnapshot {
+                capabilities: Vec::new(),
                 version: Some("0.3.0".into()),
                 projects: captured.lock().unwrap().iter().cloned().collect(),
                 selected_project: None,
@@ -157,6 +160,7 @@ fn open_returns_verified_target_state_and_reports_failures() {
         fs::write(&file, "# Reader").unwrap();
         let socket = dir.join("control.sock");
         let state = Arc::new(Mutex::new(BrowserStateSnapshot {
+            capabilities: Vec::new(),
             version: Some("0.3.0".into()),
             projects: vec![],
             selected_project: None,
@@ -175,11 +179,13 @@ fn open_returns_verified_target_state_and_reports_failures() {
             {
                 assert_eq!(fragment.as_deref(), Some("reader"));
                 state.projects.push(ProjectSnapshot {
+                    selected_kind: DocumentKind::Markdown,
                     key: project.key.clone(),
                     label: project.label.clone(),
                     selected_source_file: Some(source_file.clone()),
                     documents: vec![DocumentSnapshot {
                         kind: DocumentKind::Markdown,
+                        open_request_id: None,
                         source_file: source_file.clone(),
                         url: String::new(),
                         title: Some("Reader".into()),
@@ -233,6 +239,95 @@ fn open_returns_verified_target_state_and_reports_failures() {
                     .unwrap()
                     .contains("a%20file.md#reader")
             );
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[test]
+fn source_opens_require_capability_and_their_own_request_identity() {
+    for (capable, superseded) in [(false, false), (true, true), (true, false)] {
+        let dir = directory("source");
+        let file = dir.join("source.rs");
+        fs::write(&file, "fn main() {}\n").unwrap();
+        let socket = dir.join("control.sock");
+        let state = Arc::new(Mutex::new(BrowserStateSnapshot {
+            capabilities: if capable {
+                vec!["source_documents_v1".into()]
+            } else {
+                Vec::new()
+            },
+            version: Some("0.4.0".into()),
+            projects: Vec::new(),
+            selected_project: None,
+            presentation_count: 0,
+            process_id: 42,
+            runtime_id: Some("works.from-nibly.Smad:42".into()),
+        }));
+        let captured = state.clone();
+        let server = SocketServer::bind(&socket, move |request| {
+            let mut state = captured.lock().unwrap();
+            if let Command::OpenCode {
+                project,
+                source_file,
+                highlights,
+            } = &request.command
+            {
+                assert!(capable);
+                assert_eq!(smad_protocol::format_ranges(highlights), "2-4,48");
+                state.projects = vec![ProjectSnapshot {
+                    key: project.key.clone(),
+                    label: project.label.clone(),
+                    selected_kind: DocumentKind::Code,
+                    selected_source_file: Some(source_file.clone()),
+                    documents: vec![DocumentSnapshot {
+                        kind: DocumentKind::Code,
+                        source_file: source_file.clone(),
+                        url: String::new(),
+                        title: None,
+                        lifecycle: DocumentLifecycleSnapshot::Ready,
+                        diagnostic: None,
+                        open_request_id: Some(if superseded {
+                            "another-open".into()
+                        } else {
+                            request.request_id.clone()
+                        }),
+                    }],
+                }];
+            }
+            ResponseEnvelope {
+                protocol_version: PROTOCOL_VERSION,
+                request_id: request.request_id,
+                status: ResponseStatus::Ok,
+                error_code: None,
+                message: None,
+                state: matches!(request.command, Command::InspectState).then(|| state.clone()),
+            }
+        })
+        .unwrap();
+        let serving = std::thread::spawn(move || {
+            for _ in 0..if capable { 4 } else { 2 } {
+                server.accept().unwrap().join().unwrap();
+            }
+        });
+        let result = cli(&socket)
+            .env("SMAD_EXECUTABLE", "/must-not-execute")
+            .args([
+                "open",
+                &format!("code://{}?highlight=48,2-3,4", file.display()),
+                "--json",
+            ])
+            .output()
+            .unwrap();
+        serving.join().unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+        if !capable {
+            assert_eq!(value["error"]["code"], "INCOMPATIBLE_SERVER");
+        } else if superseded {
+            assert_eq!(value["error"]["code"], "OPEN_SUPERSEDED");
+        } else {
+            assert!(result.status.success(), "{value}");
+            assert_eq!(value["document"]["renderer"], "code");
         }
         fs::remove_dir_all(dir).unwrap();
     }

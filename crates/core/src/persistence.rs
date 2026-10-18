@@ -280,12 +280,20 @@ struct PersistedProject {
     raw_tab_name: Option<String>,
     documents: Vec<PersistedDocument>,
     selected_document: Option<String>,
+    #[serde(default)]
+    selected_kind: Option<DocumentKind>,
     created_at: u64,
     updated_at: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PersistedDocument {
+    #[serde(default)]
+    highlights: Vec<smad_protocol::LineRange>,
+    #[serde(default)]
+    old_highlights: Vec<smad_protocol::LineRange>,
+    #[serde(default)]
+    comparison: Option<crate::snapshots::ComparisonSpec>,
     #[serde(default)]
     kind: DocumentKind,
     canonical_source_file: String,
@@ -309,6 +317,9 @@ impl PersistedState {
                         .documents
                         .iter()
                         .map(|document| PersistedDocument {
+                            highlights: document.highlights.clone(),
+                            old_highlights: document.old_highlights.clone(),
+                            comparison: document.comparison.clone(),
                             kind: document.kind,
                             canonical_source_file: document.key.canonical_source_file.clone(),
                             lavish_url: document.lavish_url.clone(),
@@ -317,6 +328,7 @@ impl PersistedState {
                         })
                         .collect(),
                     selected_document: project.selected_document.clone(),
+                    selected_kind: Some(project.selected_kind),
                     created_at: project.created_at,
                     updated_at: project.updated_at,
                 })
@@ -337,9 +349,26 @@ impl PersistedState {
             }
             let mut documents = Vec::with_capacity(persisted.documents.len());
             for document in persisted.documents {
+                if document.canonical_source_file.contains('\0')
+                    || (document.kind != DocumentKind::Comparison && document.comparison.is_some())
+                    || smad_protocol::normalize_ranges(document.highlights.clone()).is_err()
+                    || smad_protocol::normalize_ranges(document.old_highlights.clone()).is_err()
+                    || document
+                        .comparison
+                        .as_ref()
+                        .is_some_and(|spec| spec.validate().is_err())
+                {
+                    rejected_urls += 1;
+                    continue;
+                }
                 if match document.kind {
                     DocumentKind::LavishReview => {
                         validate_session_url(&document.lavish_url).is_err()
+                    }
+                    DocumentKind::Code => !Path::new(&document.canonical_source_file).is_absolute(),
+                    DocumentKind::Comparison => {
+                        !Path::new(&document.canonical_source_file).is_absolute()
+                            || document.comparison.is_none()
                     }
                     DocumentKind::Markdown => {
                         !crate::markdown::is_markdown_path(Path::new(
@@ -352,26 +381,45 @@ impl PersistedState {
                 }
                 if documents.iter().any(|existing: &Document| {
                     existing.key.canonical_source_file == document.canonical_source_file
+                        && existing.kind == document.kind
                 }) {
                     continue;
                 }
                 documents.push(Document {
+                    highlights: document.highlights,
+                    old_highlights: document.old_highlights,
+                    comparison: document.comparison,
                     kind: document.kind,
                     key: DocumentKey {
                         project: persisted.key.clone(),
                         canonical_source_file: document.canonical_source_file,
+                        kind: document.kind,
                     },
                     lavish_url: document.lavish_url,
                     title: document.title,
                     lifecycle: DocumentLifecycle::Dormant,
                     last_activated_at: document.last_activated_at,
                     load_error: None,
+                    open_request_id: None,
                 });
             }
+            let selected_kind = persisted
+                .selected_kind
+                .or_else(|| {
+                    documents
+                        .iter()
+                        .find(|document| {
+                            Some(&document.key.canonical_source_file)
+                                == persisted.selected_document.as_ref()
+                        })
+                        .map(|document| document.kind)
+                })
+                .unwrap_or_default();
             let selected_document = persisted.selected_document.filter(|selected| {
-                documents
-                    .iter()
-                    .any(|document| document.key.canonical_source_file == *selected)
+                documents.iter().any(|document| {
+                    document.key.canonical_source_file == *selected
+                        && document.kind == selected_kind
+                })
             });
             projects.push(Project {
                 key: persisted.key,
@@ -379,6 +427,7 @@ impl PersistedState {
                 raw_tab_name: persisted.raw_tab_name,
                 documents,
                 selected_document,
+                selected_kind,
                 created_at: persisted.created_at,
                 updated_at: persisted.updated_at,
             });

@@ -6,6 +6,8 @@ mod markdown;
 mod memory;
 #[path = "mermaid.rs"]
 mod mermaid;
+#[path = "source_view.rs"]
+mod source_view;
 #[path = "surface.rs"]
 mod surface;
 #[path = "table.rs"]
@@ -87,6 +89,8 @@ struct PendingRequest {
 struct AppController {
     window: gtk::ApplicationWindow,
     notebook: gtk::Notebook,
+    download_status: gtk::Label,
+    downloads_configured: Cell<bool>,
     model: RefCell<BrowserModel>,
     store: MetadataStore,
     rendering: Cell<bool>,
@@ -138,11 +142,11 @@ impl AppController {
             .child(&root)
             .build();
         window.set_widget_name("smad-window");
-        webview::configure_downloads(&window, &download_status);
-
         let controller = Rc::new(Self {
             window,
             notebook,
+            download_status,
+            downloads_configured: Cell::new(false),
             model: RefCell::new(model),
             store,
             rendering: Cell::new(false),
@@ -337,6 +341,91 @@ impl AppController {
     fn handle_command(self: &Rc<Self>, request: RequestEnvelope) -> ResponseEnvelope {
         let request_id = request.request_id;
         match request.command {
+            Command::OpenCode {
+                project,
+                source_file,
+                highlights,
+            } => self.open_source(
+                request_id,
+                project,
+                source_file,
+                highlights,
+                Vec::new(),
+                None,
+            ),
+            Command::OpenComparison {
+                project,
+                source_file,
+                before_file,
+                after_file,
+                live_after,
+                before_label,
+                after_label,
+                highlights,
+                old_highlights,
+            } => {
+                let prepared = (|| -> Result<smad_core::snapshots::ComparisonSpec, String> {
+                    smad_protocol::normalize_ranges(highlights.clone())?;
+                    smad_protocol::normalize_ranges(old_highlights.clone())?;
+                    if before_label.len() > 512 || after_label.len() > 512 {
+                        return Err("comparison labels exceed 512 bytes".into());
+                    }
+                    if live_after && after_file.is_none() {
+                        return Err("a live comparison requires an after path".into());
+                    }
+                    let store = smad_core::snapshots::SnapshotStore::from_environment()?;
+                    let before = before_file
+                        .as_ref()
+                        .map(|path| store.capture(Path::new(path)))
+                        .transpose()?;
+                    let after = if live_after
+                        && after_file
+                            .as_ref()
+                            .is_some_and(|path| !Path::new(path).exists())
+                    {
+                        None
+                    } else {
+                        after_file
+                            .as_ref()
+                            .map(|path| store.capture(Path::new(path)))
+                            .transpose()?
+                    };
+                    if before.is_none() && after.is_none() {
+                        return Err("both comparison inputs are absent".into());
+                    }
+                    let live_after = if live_after {
+                        Some(
+                            smad_core::source::canonical_location(Path::new(
+                                after_file.as_ref().expect("validated after path"),
+                            ))?
+                            .to_string_lossy()
+                            .into_owned(),
+                        )
+                    } else {
+                        None
+                    };
+                    let spec = smad_core::snapshots::ComparisonSpec {
+                        before,
+                        after,
+                        live_after,
+                        before_label,
+                        after_label,
+                    };
+                    spec.validate()?;
+                    Ok(spec)
+                })();
+                match prepared {
+                    Ok(spec) => self.open_source(
+                        request_id,
+                        project,
+                        source_file,
+                        highlights,
+                        old_highlights,
+                        Some(spec),
+                    ),
+                    Err(error) => response(request_id, ResponseStatus::Error, &error, None),
+                }
+            }
             Command::OpenMarkdown {
                 project,
                 source_file,
@@ -347,18 +436,11 @@ impl AppController {
                     Ok(path) => path.to_str().expect("validated path").to_owned(),
                     Err(error) => return response(request_id, ResponseStatus::Error, &error, None),
                 };
-                if self.conflicting_kind(&source, DocumentKind::Markdown) {
-                    return response(
-                        request_id,
-                        ResponseStatus::Error,
-                        "source already open as another document kind",
-                        None,
-                    );
-                }
                 self.reconcile_live_zellij_projects();
                 let key = DocumentKey {
                     project: project.key.clone(),
                     canonical_source_file: source.clone(),
+                    kind: DocumentKind::Markdown,
                 };
                 self.mutate_with_render(
                     |model| {
@@ -387,23 +469,15 @@ impl AppController {
                 source_file,
                 url,
             } => {
-                if self.conflicting_kind(&source_file, DocumentKind::LavishReview) {
-                    return response(
-                        request_id,
-                        ResponseStatus::Error,
-                        "source already open as another document kind",
-                        None,
-                    );
-                }
                 self.reconcile_live_zellij_projects();
                 let structural_open = {
                     let model = self.model.borrow();
                     !model.projects.iter().any(|existing_project| {
                         existing_project.key == project.key
-                            && existing_project
-                                .documents
-                                .iter()
-                                .any(|document| document.key.canonical_source_file == source_file)
+                            && existing_project.documents.iter().any(|document| {
+                                document.key.canonical_source_file == source_file
+                                    && document.kind == DocumentKind::LavishReview
+                            })
                     })
                 };
                 let view_actions: Vec<_> = self
@@ -412,7 +486,10 @@ impl AppController {
                     .projects
                     .iter()
                     .flat_map(|project| &project.documents)
-                    .filter(|document| document.key.canonical_source_file == source_file)
+                    .filter(|document| {
+                        document.key.canonical_source_file == source_file
+                            && document.kind == DocumentKind::LavishReview
+                    })
                     .map(|document| {
                         (
                             document.key.clone(),
@@ -655,6 +732,73 @@ impl AppController {
         changed
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn open_source(
+        self: &Rc<Self>,
+        request_id: String,
+        project: smad_protocol::ProjectMetadata,
+        source_file: String,
+        highlights: Vec<smad_protocol::LineRange>,
+        old_highlights: Vec<smad_protocol::LineRange>,
+        comparison: Option<smad_core::snapshots::ComparisonSpec>,
+    ) -> ResponseEnvelope {
+        let prepared = (|| -> Result<_, String> {
+            let highlights = smad_protocol::normalize_ranges(highlights)?;
+            let old_highlights = smad_protocol::normalize_ranges(old_highlights)?;
+            let source = if comparison.is_some() {
+                smad_core::source::canonical_location(Path::new(&source_file))?
+            } else {
+                let path = smad_core::source::canonical_source(Path::new(&source_file))?;
+                smad_core::source::read_source(&path)?;
+                path
+            };
+            Ok((
+                source.to_string_lossy().into_owned(),
+                highlights,
+                old_highlights,
+            ))
+        })();
+        let (source, highlights, old_highlights) = match prepared {
+            Ok(value) => value,
+            Err(error) => return response(request_id, ResponseStatus::Error, &error, None),
+        };
+        let kind = if comparison.is_some() {
+            DocumentKind::Comparison
+        } else {
+            DocumentKind::Code
+        };
+        let key = DocumentKey {
+            project: project.key.clone(),
+            canonical_source_file: source.clone(),
+            kind,
+        };
+        self.reconcile_live_zellij_projects();
+        self.document_views.borrow_mut().remove(&key);
+        self.mutate_with_render(
+            |model| {
+                model.open_document(project, source, String::new(), kind, timestamp());
+                let document = model
+                    .projects
+                    .iter_mut()
+                    .flat_map(|project| &mut project.documents)
+                    .find(|document| document.key == key)
+                    .expect("opened source");
+                document.highlights = highlights;
+                document.old_highlights = old_highlights;
+                document.comparison = comparison;
+                document.open_request_id = Some(request_id.clone());
+                document.lifecycle = DocumentLifecycle::Loading;
+                document.load_error = None;
+                true
+            },
+            true,
+        );
+        self.presentation_count
+            .set(self.presentation_count.get().saturating_add(1));
+        self.window.present();
+        response(request_id, ResponseStatus::Ok, "native source opened", None)
+    }
+
     fn sync_selection_widgets(&self) {
         if self.rendering.replace(true) {
             return;
@@ -672,6 +816,7 @@ impl AppController {
                             project.selected_document.as_ref().and_then(|source| {
                                 project.documents.iter().position(|document| {
                                     &document.key.canonical_source_file == source
+                                        && document.kind == project.selected_kind
                                 })
                             });
                         (selected.clone(), index, document_index)
@@ -805,10 +950,10 @@ impl AppController {
             list.append(&row);
         }
         if let Some(selected) = &project.selected_document
-            && let Some(index) = project
-                .documents
-                .iter()
-                .position(|document| &document.key.canonical_source_file == selected)
+            && let Some(index) = project.documents.iter().position(|document| {
+                &document.key.canonical_source_file == selected
+                    && document.kind == project.selected_kind
+            })
             && let Some(row) = list.row_at_index(index as i32)
         {
             list.select_row(Some(&row));
@@ -831,12 +976,8 @@ impl AppController {
                 .iter()
                 .find(|project| project.key == project_key)
                 .and_then(|project| project.documents.get(row.index() as usize))
-                .map(|document| document.key.canonical_source_file.clone());
-            if let Some(source) = source {
-                let key = DocumentKey {
-                    project: project_key.clone(),
-                    canonical_source_file: source,
-                };
+                .map(|document| document.key.clone());
+            if let Some(key) = source {
                 // Selecting a dormant document can rebuild this list, so wait until
                 // GTK finishes emitting row-selected before mutating the widget tree.
                 let weak = Rc::downgrade(&controller);
@@ -873,15 +1014,16 @@ impl AppController {
                         document,
                         globally_selected,
                         project.selected_document.as_deref(),
+                        project.selected_kind,
                     ),
                     Some(&format!("document-{index}")),
                 );
             }
             if let Some(selected) = &project.selected_document
-                && let Some(index) = project
-                    .documents
-                    .iter()
-                    .position(|document| &document.key.canonical_source_file == selected)
+                && let Some(index) = project.documents.iter().position(|document| {
+                    &document.key.canonical_source_file == selected
+                        && document.kind == project.selected_kind
+                })
             {
                 stack.set_visible_child_name(&format!("document-{index}"));
             }
@@ -939,9 +1081,11 @@ impl AppController {
         document: &smad_core::Document,
         project_is_globally_selected: bool,
         selected_source: Option<&str>,
+        selected_kind: DocumentKind,
     ) -> gtk::Widget {
-        let document_is_locally_selected =
-            selected_source == Some(&document.key.canonical_source_file);
+        let document_is_locally_selected = selected_source
+            == Some(&document.key.canonical_source_file)
+            && selected_kind == document.kind;
         let already_materialized = self.document_views.borrow().contains_key(&document.key);
         match memory::materialization_plan(
             project_is_globally_selected,
@@ -953,15 +1097,6 @@ impl AppController {
             }
             memory::MaterializationPlan::Placeholder => document_placeholder(document, self),
         }
-    }
-
-    fn conflicting_kind(&self, source: &str, kind: DocumentKind) -> bool {
-        self.model
-            .borrow()
-            .projects
-            .iter()
-            .flat_map(|p| &p.documents)
-            .any(|d| d.key.canonical_source_file == source && d.kind != kind)
     }
 
     fn document_view(self: &Rc<Self>, document: &smad_core::Document) -> Rc<surface::DocumentView> {
@@ -1001,6 +1136,11 @@ impl AppController {
             document.key.canonical_source_file,
             project_accessible_identity(&document.key.project)
         );
+        if matches!(document.kind, DocumentKind::Code | DocumentKind::Comparison) {
+            return Rc::new(surface::DocumentView::Source(source_view::SourceView::new(
+                document, &identity, emit,
+            )));
+        }
         if document.kind == DocumentKind::Markdown {
             let weak = Rc::downgrade(self);
             let project_key = key.project.clone();
@@ -1044,6 +1184,11 @@ impl AppController {
                 ),
             ));
         }
+        // Creating the default network session starts a WebKit child process.
+        // Native-only documents must never initialize it merely for downloads.
+        if !self.downloads_configured.replace(true) {
+            webview::configure_downloads(&self.window, &self.download_status);
+        }
         Rc::new(surface::DocumentView::Review(if automation {
             webview::DocumentView::new_for_automation(
                 &document.lavish_url,
@@ -1071,12 +1216,7 @@ impl AppController {
                 .projects
                 .iter()
                 .find(|project| &project.key == project_key)?;
-            let source = project.selected_document.as_ref()?;
-            project
-                .documents
-                .iter()
-                .find(|document| &document.key.canonical_source_file == source)?
-                .clone()
+            project.selected()?.clone()
         };
         if document.kind != DocumentKind::LavishReview {
             return None;
@@ -1107,6 +1247,11 @@ impl AppController {
                 return;
             };
             match event {
+                webview::DocumentEvent::HighlightsCleared => {
+                    document.highlights.clear();
+                    document.old_highlights.clear();
+                    document.open_request_id = None;
+                }
                 webview::DocumentEvent::Loading => {
                     document.lifecycle = DocumentLifecycle::Loading;
                     document.load_error = None;
@@ -1151,7 +1296,12 @@ fn document_row(document: &smad_core::Document, controller: &Rc<AppController>) 
     name.set_hexpand(true);
     name.set_ellipsize(gtk::pango::EllipsizeMode::End);
     name.set_max_width_chars(28);
-    let detail = gtk::Label::new(Some(detail_text));
+    let detail_text = if document.kind == DocumentKind::LavishReview {
+        detail_text.to_owned()
+    } else {
+        format!("{:?} · {detail_text}", document.kind)
+    };
+    let detail = gtk::Label::new(Some(&detail_text));
     detail.set_xalign(0.0);
     detail.add_css_class("dim-label");
     detail.add_css_class("caption");
@@ -1235,8 +1385,13 @@ fn document_placeholder(
     let title = gtk::Label::new(Some(basename));
     title.add_css_class("title-2");
     let status = gtk::Label::new(Some(&format!(
-        "{} — Web content will be created when selected",
-        lifecycle_text(&document.lifecycle)
+        "{} — {} content will be created when selected",
+        lifecycle_text(&document.lifecycle),
+        if document.kind == DocumentKind::LavishReview {
+            "Web"
+        } else {
+            "Native"
+        }
     )));
     status.set_widget_name(&format!("document-placeholder-status-{identity}"));
     status.update_property(&[gtk::accessible::Property::Label(&format!(
@@ -1279,12 +1434,7 @@ fn selection_requires_render(
             .projects
             .iter()
             .find(|project| &project.key == project_key)?;
-        let source = project.selected_document.as_ref()?;
-        project
-            .documents
-            .iter()
-            .find(|document| &document.key.canonical_source_file == source)
-            .map(|document| &document.key)
+        project.selected().map(|document| &document.key)
     });
     selected.is_some_and(|key| !is_materialized(key))
 }
@@ -1307,6 +1457,7 @@ fn response(
 
 fn snapshot(model: &BrowserModel, presentation_count: u64) -> BrowserStateSnapshot {
     BrowserStateSnapshot {
+        capabilities: vec!["source_documents_v1".into()],
         version: Some(env!("CARGO_PKG_VERSION").into()),
         projects: model
             .projects
@@ -1315,10 +1466,12 @@ fn snapshot(model: &BrowserModel, presentation_count: u64) -> BrowserStateSnapsh
                 key: project.key.clone(),
                 label: project.label.clone(),
                 selected_source_file: project.selected_document.clone(),
+                selected_kind: project.selected_kind,
                 documents: project
                     .documents
                     .iter()
                     .map(|document| DocumentSnapshot {
+                        open_request_id: document.open_request_id.clone(),
                         kind: document.kind,
                         diagnostic: document.load_error.clone(),
                         source_file: document.key.canonical_source_file.clone(),
@@ -1394,9 +1547,14 @@ fn project_identity(key: &ProjectKey) -> String {
 
 fn document_identity(key: &DocumentKey) -> String {
     format!(
-        "{}-source-{}",
+        "{}-source-{}{}",
         project_identity(&key.project),
-        encode_identifier(&key.canonical_source_file)
+        encode_identifier(&key.canonical_source_file),
+        if key.kind == DocumentKind::LavishReview {
+            String::new()
+        } else {
+            format!("-{:?}", key.kind).to_lowercase()
+        }
     )
 }
 
@@ -1428,6 +1586,7 @@ mod tests {
         snapshot,
     };
     use smad_core::{BrowserModel, DocumentKey, DocumentLifecycle};
+    use smad_protocol::DocumentKind;
     use smad_protocol::{ProjectKey, ProjectMetadata};
 
     #[test]
@@ -1477,14 +1636,17 @@ mod tests {
         };
         let first = DocumentKey {
             project: first_project.clone(),
+            kind: DocumentKind::LavishReview,
             canonical_source_file: "/work/a/report.html".into(),
         };
         let same_basename = DocumentKey {
             project: first_project,
+            kind: DocumentKind::LavishReview,
             canonical_source_file: "/work/b/report.html".into(),
         };
         let same_source_other_project = DocumentKey {
             project: second_project,
+            kind: DocumentKind::LavishReview,
             canonical_source_file: first.canonical_source_file.clone(),
         };
         assert_ne!(document_identity(&first), document_identity(&same_basename));
@@ -1496,10 +1658,12 @@ mod tests {
             document_identity(&DocumentKey {
                 project: first.project.clone(),
                 canonical_source_file: "/work/a-b/report.html".into(),
+                kind: DocumentKind::LavishReview,
             }),
             document_identity(&DocumentKey {
                 project: first.project.clone(),
                 canonical_source_file: "/work/a/b-report.html".into(),
+                kind: DocumentKind::LavishReview,
             })
         );
     }

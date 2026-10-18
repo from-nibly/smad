@@ -1,5 +1,8 @@
 //! Versioned, GUI-free browser-control wire protocol.
 
+pub mod source_ranges;
+pub use source_ranges::{LineRange, format_ranges, normalize_ranges, parse_ranges};
+
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use thiserror::Error;
@@ -64,6 +67,26 @@ pub enum Command {
         #[serde(default)]
         fragment: Option<String>,
     },
+    OpenCode {
+        project: ProjectMetadata,
+        source_file: String,
+        #[serde(default)]
+        highlights: Vec<LineRange>,
+    },
+    OpenComparison {
+        project: ProjectMetadata,
+        source_file: String,
+        before_file: Option<String>,
+        after_file: Option<String>,
+        #[serde(default)]
+        live_after: bool,
+        before_label: String,
+        after_label: String,
+        #[serde(default)]
+        highlights: Vec<LineRange>,
+        #[serde(default)]
+        old_highlights: Vec<LineRange>,
+    },
     SelectProject {
         session_name: String,
         stable_tab_id: u32,
@@ -115,6 +138,8 @@ pub struct ResponseEnvelope {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BrowserStateSnapshot {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capabilities: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     pub projects: Vec<ProjectSnapshot>,
@@ -128,21 +153,27 @@ pub struct BrowserStateSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectSnapshot {
     pub key: ProjectKey,
+    #[serde(default)]
+    pub selected_kind: DocumentKind,
     pub label: String,
     pub selected_source_file: Option<String>,
     pub documents: Vec<DocumentSnapshot>,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentKind {
     #[default]
     LavishReview,
     Markdown,
+    Code,
+    Comparison,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DocumentSnapshot {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_request_id: Option<String>,
     #[serde(default)]
     pub kind: DocumentKind,
     pub source_file: String,

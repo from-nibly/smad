@@ -6,5 +6,5 @@ Exec=smad-axi open %u
 Icon=works.from-nibly.Smad
 Terminal=false
 NoDisplay=true
-MimeType=x-scheme-handler/md;x-scheme-handler/lavish;
+MimeType=x-scheme-handler/code;x-scheme-handler/md;x-scheme-handler/lavish;
 Categories=Development;Viewer;

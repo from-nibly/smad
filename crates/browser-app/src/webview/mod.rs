@@ -9,6 +9,7 @@ use webkit6::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DocumentEvent {
+    HighlightsCleared,
     Loading,
     Ready(Option<String>),
     ReadyWithWarnings(Option<String>, String),
@@ -129,6 +130,10 @@ impl<K: Eq + Hash, V> RetainedRegistry<K, V> {
 
     pub(crate) fn values(&self) -> impl Iterator<Item = &V> {
         self.values.values()
+    }
+
+    pub(crate) fn remove(&mut self, key: &K) -> Option<V> {
+        self.values.remove(key)
     }
 
     pub(crate) fn insert(&mut self, key: K, value: V) {
@@ -434,7 +439,7 @@ impl DocumentView {
                                         content.set_visible_child_name("reconnect");
                                     }
                                 }
-                                DocumentEvent::Loading => {}
+                                DocumentEvent::Loading | DocumentEvent::HighlightsCleared => {}
                             }
                             emit(event);
                         }

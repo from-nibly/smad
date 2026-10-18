@@ -78,6 +78,7 @@ fn reconciliation_uses_exact_session_and_stable_id_and_keeps_standalone() {
     model.set_document_lifecycle(
         &DocumentKey {
             project: zellij("main", 4),
+            kind: smad_protocol::DocumentKind::LavishReview,
             canonical_source_file: "/live-main".into(),
         },
         DocumentLifecycle::Ready,
@@ -207,6 +208,7 @@ fn live_reconciliation_can_preserve_materialized_document_state() {
     model.set_document_lifecycle(
         &DocumentKey {
             project: zellij("main", 16),
+            kind: smad_protocol::DocumentKind::LavishReview,
             canonical_source_file: "/hiding".into(),
         },
         DocumentLifecycle::Ready,
