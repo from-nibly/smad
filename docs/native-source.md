@@ -22,8 +22,10 @@ overlap/adjacency. Zero, reversed, malformed and excessive ranges are rejected.
 There is one query parameter, `highlight`; repeated/unknown keys are errors.
 Encode literal `?`, `#` and `%` in filenames. Code URIs do not accept fragments.
 
-Agent attention uses an amber gutter marker and double underline, separately from
-syntax colors, red/green change backgrounds and normal GTK text selection.
+Agent attention uses an amber gutter marker and full-width line background,
+including blank lines. Syntax colors and normal GTK text selection remain intact.
+On highlighted comparison rows, amber replaces the red/green background; the
+separate +/− gutter markers retain addition/deletion meaning.
 Opening scrolls to the first highlighted range. Previous/next and Clear buttons
 are keyboard accessible. Out-of-bounds ranges produce a visible/API warning and
 emphasize only existing lines; they never refer to wrapped/display rows.

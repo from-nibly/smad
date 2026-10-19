@@ -64,10 +64,14 @@ fn whole_source_comparison_ranges_live_updates_and_cleanup() {
     let original = format!(
         "// UTF-8 é🦀 — whole-file source\nfn main() {{\n{}\n}}",
         (1..=130)
-            .map(|line| format!(
-                "    let value_{line} = {line}; // original source line {}",
-                line + 2
-            ))
+            .map(|line| if line == 2 {
+                String::new()
+            } else {
+                format!(
+                    "    let value_{line} = {line}; // original source line {}",
+                    line + 2
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n")
     );
@@ -111,11 +115,24 @@ fn whole_source_comparison_ranges_live_updates_and_cleanup() {
             original
         );
         let tag = buffer.tag_table().lookup("agent-highlight").unwrap();
+        assert!(tag.property::<bool>("paragraph-background-set"));
+        assert!(!tag.property::<bool>("underline-set"));
+        assert_eq!(tag.priority(), buffer.tag_table().size() - 1);
         {
             let rendered = view.rendered.borrow();
             let rendered = rendered.as_ref().unwrap();
             assert_eq!(rendered.rows.len(), original.lines().count());
             assert!(buffer.iter_at_offset(rendered.rows[1].start).has_tag(&tag));
+            let blank = &rendered.rows[3];
+            assert_eq!(
+                buffer.text(
+                    &buffer.iter_at_offset(blank.start),
+                    &buffer.iter_at_offset(blank.end),
+                    true
+                ),
+                "\n"
+            );
+            assert!(buffer.iter_at_offset(blank.start).has_tag(&tag));
             assert!(!buffer.iter_at_offset(rendered.rows[5].start).has_tag(&tag));
             assert!(buffer.iter_at_offset(rendered.rows[89].start).has_tag(&tag));
             assert!(
@@ -132,6 +149,39 @@ fn whole_source_comparison_ranges_live_updates_and_cleanup() {
             } else {
                 "source-code-light.png"
             },
+        );
+        // TextTag assertions alone miss GTK's empty-paragraph painting gap.
+        // Sample the blank highlighted row near the viewport's right edge.
+        let visible = view.text.visible_rect();
+        let (y, height) = view.text.line_yrange(&buffer.iter_at_line(3).unwrap());
+        let (x, y) = view.text.buffer_to_window_coords(
+            gtk::TextWindowType::Widget,
+            visible.x() + visible.width() - 8,
+            y + height / 2,
+        );
+        let point = view
+            .text
+            .compute_point(&window, &gtk::graphene::Point::new(x as f32, y as f32))
+            .unwrap();
+        let snapshot = gtk::Snapshot::new();
+        gtk::WidgetPaintable::new(Some(&window)).snapshot(
+            &snapshot,
+            window.width() as f64,
+            window.height() as f64,
+        );
+        let texture = window
+            .renderer()
+            .unwrap()
+            .render_texture(snapshot.to_node().unwrap(), None);
+        let stride = texture.width() as usize * 4;
+        let mut pixels = vec![0; stride * texture.height() as usize];
+        texture.download(&mut pixels, stride);
+        let offset = point.y() as usize * stride + point.x() as usize * 4;
+        let native = u32::from_ne_bytes(pixels[offset..offset + 4].try_into().unwrap());
+        assert_eq!(
+            native,
+            if dark { 0xff4b3d1e } else { 0xffffefb8 },
+            "blank source row must visibly fill the viewport"
         );
         click(&view, "Next highlight");
         pump(180);
@@ -174,14 +224,14 @@ fn whole_source_comparison_ranges_live_updates_and_cleanup() {
     let store = SnapshotStore::from_environment().unwrap();
     let before = store.capture(&path).unwrap();
     let changed = original
-        .replace("let value_2 = 2;", "let value_2 = 200; // modified")
+        .replace("let value_1 = 1;", "let value_1 = 200; // modified")
         .replace("    let value_10 = 10; // original source line 12\n", "")
         .replace("let value_20 = 20;", "let value_20 = 2000;");
     std::fs::write(&path, &changed).unwrap();
     document.kind = DocumentKind::Comparison;
     document.key.kind = DocumentKind::Comparison;
     document.highlights = vec![
-        LineRange { start: 4, end: 4 },
+        LineRange { start: 3, end: 4 },
         LineRange { start: 21, end: 23 },
     ];
     document.old_highlights = vec![LineRange { start: 12, end: 12 }];

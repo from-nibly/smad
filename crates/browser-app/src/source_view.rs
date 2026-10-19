@@ -1,4 +1,6 @@
 //! Native whole-file source/comparison reader. GTK owns selection; the gutter is not text.
+#[path = "source_text_view.rs"]
+mod source_text_view;
 #[cfg(test)]
 #[path = "source_view_tests.rs"]
 mod tests;
@@ -81,9 +83,14 @@ fn contrasting_color(color: (u8, u8, u8), dark: bool) -> (u8, u8, u8) {
         0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
     };
     let backgrounds = if dark {
-        [(32, 37, 43), (22, 51, 35), (59, 34, 40)]
+        [(32, 37, 43), (22, 51, 35), (59, 34, 40), (75, 61, 30)]
     } else {
-        [(255, 255, 255), (229, 248, 231), (255, 233, 231)]
+        [
+            (255, 255, 255),
+            (229, 248, 231),
+            (255, 233, 231),
+            (255, 239, 184),
+        ]
     };
     for step in 0..=100_u16 {
         let blend = |value: u8| {
@@ -337,13 +344,14 @@ impl SourceView {
         toolbar.append(&reload);
         root.append(&toolbar);
         let legend = gtk::Label::new(Some(if document.comparison.is_some() {
-            "Gutter: OLD | NEW source lines · green +: added · red −: deleted · amber gutter + underline: agent highlight"
+            "Gutter: OLD | NEW source lines · green +: added · red −: deleted · amber gutter + full-line background: agent highlight"
         } else {
-            "Gutter: original source lines · amber gutter + underline: agent highlight · selection and copied text exclude the gutter"
+            "Gutter: original source lines · amber gutter + full-line background: agent highlight · selection and copied text exclude the gutter"
         }));
         legend.set_xalign(0.0);
         root.append(&legend);
-        let text = gtk::TextView::new();
+        let text =
+            glib::Object::new::<source_text_view::SourceTextView>().upcast::<gtk::TextView>();
         text.set_editable(false);
         text.set_cursor_visible(true);
         text.set_monospace(true);
@@ -608,21 +616,15 @@ impl SourceView {
                 buffer
                     .create_tag(
                         Some("agent-highlight"),
-                        &[
-                            ("underline", &gtk::pango::Underline::Double),
-                            (
-                                "underline-rgba",
-                                &gtk::gdk::RGBA::parse(if self.dark {
-                                    "#ffd166"
-                                } else {
-                                    "#9a6700"
-                                })
-                                .unwrap(),
-                            ),
-                        ],
+                        &[(
+                            "paragraph-background",
+                            &if self.dark { "#4b3d1e" } else { "#ffefb8" },
+                        )],
                     )
                     .unwrap()
             });
+        // Keep attention visible over diff backgrounds, including after reload adds tags.
+        tag.set_priority(buffer.tag_table().size() - 1);
         buffer.remove_tag(&tag, &buffer.start_iter(), &buffer.end_iter());
         if let Some(rendered) = self.rendered.borrow().as_ref() {
             for row in &rendered.rows {
@@ -635,6 +637,7 @@ impl SourceView {
                 }
             }
         }
+        self.text.queue_draw();
         self.gutter.queue_draw();
     }
     fn present(self: &Rc<Self>, mut rendered: Rendered) {
