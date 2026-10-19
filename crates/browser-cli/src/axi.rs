@@ -106,7 +106,7 @@ fn execute(args: &[String]) -> Result<Value> {
         "schemes" if args.len() == 1 => Ok(json!({
             "schemes": [
                 {"scheme": "code://", "renderer": "native GTK source", "target": "whole local UTF-8 file; optional ?highlight=12-24,48 (1-based inclusive source lines)"},
-                {"scheme": "md://", "renderer": "native GTK Markdown", "target": "local .md/.markdown file; optional #heading"},
+                {"scheme": "md://", "renderer": "native GTK Markdown", "target": "local .md/.markdown file; optional ?highlight=12-24,48 and #heading"},
                 {"scheme": "lavish://", "renderer": "upstream Lavish + WebKit", "target": "local .html/.htm artifact"}
             ],
             "paths": "After :// is a local path, never a network host. Relative paths use the invoking directory. Percent-encode literal spaces, # and ?.",
@@ -128,7 +128,7 @@ fn execute(args: &[String]) -> Result<Value> {
 fn help(command: Option<&str>) -> Value {
     match command {
         Some("open") => {
-            json!({"usage": OPEN_HELP, "behavior": "Capture invoking project; reuse/start SMAD; open via explicit renderer; verify the target reaches Ready. --reopen only reopens user-ended Lavish sessions when explicitly requested.", "coordinates": "code:// accepts ?highlight=12-24,48 using original 1-based inclusive source lines; no highlight query for Markdown yet", "examples": ["smad-axi open 'code://./src/main.rs?highlight=12-24,48'", "smad-axi open md://./README.md", "smad-axi open 'md:///tmp/a%20file.md#heading'", "smad-axi open lavish://./review.html"], "help": ["smad-axi schemes"]})
+            json!({"usage": OPEN_HELP, "behavior": "Capture invoking project; reuse/start SMAD; open via explicit renderer; verify the target reaches Ready. --reopen only reopens user-ended Lavish sessions when explicitly requested.", "coordinates": "code:// and md:// accept ?highlight=12-24,48 using original 1-based inclusive source lines; Markdown maps text precisely or whole diagram/image widgets and warns for unmapped syntax", "examples": ["smad-axi open 'code://./src/main.rs?highlight=12-24,48'", "smad-axi open md://./README.md", "smad-axi open 'md:///tmp/a%20file.md#heading'", "smad-axi open lavish://./review.html"], "help": ["smad-axi schemes"]})
         }
         Some("compare") => {
             json!({"usage": compare::HELP, "behavior": "Whole-file unified comparison, including all unchanged context. Exact --base by default; --merge-base requires --head and resolves a single merge base once. Working-tree after is live; the base stays fixed. --old/--new capture immutable files; /dev/null explicitly denotes an absent side. --highlight uses new-side source lines; --highlight-old uses old-side lines. No diff:// scheme and no patch application.", "examples": ["smad-axi compare ./src/main.rs --base HEAD --highlight 12-24,48", "smad-axi compare ./src/main.rs --base main --head feature --merge-base", "smad-axi compare --old ./before.rs --new ./after.rs"]})
@@ -263,6 +263,7 @@ fn open(args: &[String]) -> Result<Value> {
             project: project.clone(),
             source_file: source_file.clone(),
             fragment: document.fragment.clone(),
+            highlights: document.highlights.clone(),
         },
         DocumentKind::LavishReview => {
             let mut args = vec![source_file.clone()];
@@ -353,6 +354,18 @@ fn open_command(
             "running SMAD does not support native source documents; upgrade/restart it before opening code or comparisons",
         ));
     }
+    let markdown_ranges_supported = server
+        .capabilities
+        .iter()
+        .any(|c| c == "markdown_source_ranges_v1");
+    if matches!(&command, Command::OpenMarkdown { highlights, .. } if !highlights.is_empty())
+        && !markdown_ranges_supported
+    {
+        return Err(Failure::runtime(
+            "INCOMPATIBLE_SERVER",
+            "running SMAD does not support Markdown source highlights; upgrade/restart it first",
+        ));
+    }
     let envelope = request(command);
     let response = control
         .request(&envelope)
@@ -378,7 +391,8 @@ fn open_command(
                     .find(|d| d.source_file == source_file && d.kind == kind)
             });
         if let Some(target) = target {
-            if matches!(kind, DocumentKind::Code | DocumentKind::Comparison)
+            if (matches!(kind, DocumentKind::Code | DocumentKind::Comparison)
+                || (kind == DocumentKind::Markdown && markdown_ranges_supported))
                 && target.open_request_id.as_deref() != Some(&envelope.request_id)
             {
                 return Err(Failure::runtime(

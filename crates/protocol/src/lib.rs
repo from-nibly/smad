@@ -66,6 +66,8 @@ pub enum Command {
         source_file: String,
         #[serde(default)]
         fragment: Option<String>,
+        #[serde(default)]
+        highlights: Vec<LineRange>,
     },
     OpenCode {
         project: ProjectMetadata,

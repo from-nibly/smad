@@ -84,6 +84,16 @@ def application_smoke(env, temporary):
             subprocess.run(cli, env=env, check=True)
             wait_for(lambda: any(d["kind"] == "markdown" and d["lifecycle"] == "ready" for p in state()["projects"] for d in p["documents"]))
             subprocess.run(cli, env=env, check=True)
+            assert "markdown_source_ranges_v1" in state()["capabilities"]
+            for ranges, expected in (("1", "ready"), ("99999", "ready_with_warnings")):
+                highlighted = json.loads(subprocess.check_output(cli[:2] + [cli[2] + "?highlight=" + ranges, "--json"], env=env, text=True))
+                assert highlighted["document"]["state"] == expected, highlighted
+                saved_md = json.loads((Path(env["XDG_STATE_HOME"]) / "smad/state.json").read_text())
+                md = next(d for p in saved_md["projects"] for d in p["documents"] if d["kind"] == "markdown")
+                assert md["highlights"] == [{"start": int(ranges), "end": int(ranges)}], md
+                assert state()["projects"][0]["documents"][0]["open_request_id"]
+            cleared = json.loads(subprocess.check_output(cli, env=env, text=True))
+            assert cleared["document"]["state"] == "ready", cleared
             native = state()
             assert sum(len(p["documents"]) for p in native["projects"]) == 1
             axi = str(binaries / "smad-axi")
@@ -233,9 +243,10 @@ with tempfile.TemporaryDirectory(prefix="lavish-markdown-test-") as temporary:
             # Rust creates a fresh thread per test even with --test-threads=1;
             # GTK must initialize on only one thread per process.
             logs = []
-            for test in ("application::markdown::tests::native_reader_live_updates_selection_links_and_cleanup", "application::source_view::tests::whole_source_comparison_ranges_live_updates_and_cleanup"):
+            for test in ("application::markdown::mapping_tests::source_line_mapping_poc", "application::markdown::tests::native_reader_live_updates_selection_links_and_cleanup", "application::source_view::tests::whole_source_comparison_ranges_live_updates_and_cleanup"):
                 command = ["cargo", "test", "-p", "smad", "--bin", "smad", test, "--", "--exact", "--ignored", "--test-threads=1", "--nocapture"]
-                result = subprocess.run(command, cwd=ROOT, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
+                test_env = dict(env, SMAD_MARKDOWN_MAPPING_POC="1") if test.endswith("source_line_mapping_poc") else env
+                result = subprocess.run(command, cwd=ROOT, env=test_env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
                 logs.append(result.stdout)
                 (EVIDENCE / "native-test.log").write_text("\n".join(logs))
                 print(result.stdout, end="")

@@ -10,6 +10,7 @@ use webkit6::prelude::*;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DocumentEvent {
     HighlightsCleared,
+    HighlightsChanged(Vec<smad_protocol::LineRange>),
     Loading,
     Ready(Option<String>),
     ReadyWithWarnings(Option<String>, String),
@@ -439,7 +440,9 @@ impl DocumentView {
                                         content.set_visible_child_name("reconnect");
                                     }
                                 }
-                                DocumentEvent::Loading | DocumentEvent::HighlightsCleared => {}
+                                DocumentEvent::Loading
+                                | DocumentEvent::HighlightsCleared
+                                | DocumentEvent::HighlightsChanged(_) => {}
                             }
                             emit(event);
                         }

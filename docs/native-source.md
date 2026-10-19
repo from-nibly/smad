@@ -114,8 +114,8 @@ working-tree path is an absent side. Git symlinks/submodules are not supported.
   garbage-collected. Removing snapshots with SMAD closed can make saved comparisons
   unavailable; retain the snapshot directory with state backups.
 - Unified view only. Side-by-side, inline word changes, move detection, editing,
-  patch application and Markdown **source-line** overlays are not implemented.
-  `md://...?highlight=...` is explicitly rejected; Markdown heading fragments remain supported.
+  and patch application are not implemented.
+- Markdown source ranges are supported separately: see [native Markdown mapping](native-markdown.md#source-line-highlights).
 
 The server advertises `source_documents_v1`; AXI rejects older running servers for
 these commands instead of claiming a successful open. Existing protocol-v2 review,

@@ -35,8 +35,8 @@ impl DocumentUri {
             );
         }
         let highlights = if let Some(query) = query {
-            if kind != DocumentKind::Code {
-                return Err("source-line highlight queries currently require code://; Markdown source mapping is not implemented".into());
+            if !matches!(kind, DocumentKind::Code | DocumentKind::Markdown) {
+                return Err("source-line highlight queries require code:// or md://".into());
             }
             let value = query
                 .strip_prefix("highlight=")
@@ -171,6 +171,16 @@ mod tests {
                 "{invalid}"
             );
         }
+        let mapped =
+            DocumentUri::parse("md://./A%20file%23.md?highlight=5,2-3,4#title", &directory)
+                .unwrap();
+        assert_eq!(smad_protocol::format_ranges(&mapped.highlights), "2-5");
+        assert_eq!(mapped.fragment.as_deref(), Some("title"));
+        assert_eq!(
+            DocumentUri::parse(&mapped.canonical_uri(), Path::new("/")),
+            Ok(mapped)
+        );
+        assert!(DocumentUri::parse("md://./A%20file%23.md?highlight=0", &directory).is_err());
         std::fs::remove_dir_all(directory).unwrap();
     }
 }

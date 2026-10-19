@@ -175,6 +175,7 @@ fn open_returns_verified_target_state_and_reports_failures() {
                 project,
                 source_file,
                 fragment,
+                ..
             } = &request.command
             {
                 assert_eq!(fragment.as_deref(), Some("reader"));
@@ -246,14 +247,22 @@ fn open_returns_verified_target_state_and_reports_failures() {
 
 #[test]
 fn source_opens_require_capability_and_their_own_request_identity() {
-    for (capable, superseded) in [(false, false), (true, true), (true, false)] {
+    for (kind, scheme, capability, capable, superseded) in [
+        (DocumentKind::Code, "code", "source_documents_v1"),
+        (DocumentKind::Markdown, "md", "markdown_source_ranges_v1"),
+    ]
+    .into_iter()
+    .flat_map(|(kind, scheme, capability)| {
+        [(false, false), (true, true), (true, false)]
+            .map(|(capable, superseded)| (kind, scheme, capability, capable, superseded))
+    }) {
         let dir = directory("source");
-        let file = dir.join("source.rs");
+        let file = dir.join("source.md");
         fs::write(&file, "fn main() {}\n").unwrap();
         let socket = dir.join("control.sock");
         let state = Arc::new(Mutex::new(BrowserStateSnapshot {
             capabilities: if capable {
-                vec!["source_documents_v1".into()]
+                vec![capability.into()]
             } else {
                 Vec::new()
             },
@@ -271,6 +280,12 @@ fn source_opens_require_capability_and_their_own_request_identity() {
                 project,
                 source_file,
                 highlights,
+            }
+            | Command::OpenMarkdown {
+                project,
+                source_file,
+                highlights,
+                ..
             } = &request.command
             {
                 assert!(capable);
@@ -278,10 +293,10 @@ fn source_opens_require_capability_and_their_own_request_identity() {
                 state.projects = vec![ProjectSnapshot {
                     key: project.key.clone(),
                     label: project.label.clone(),
-                    selected_kind: DocumentKind::Code,
+                    selected_kind: kind,
                     selected_source_file: Some(source_file.clone()),
                     documents: vec![DocumentSnapshot {
-                        kind: DocumentKind::Code,
+                        kind,
                         source_file: source_file.clone(),
                         url: String::new(),
                         title: None,
@@ -314,7 +329,7 @@ fn source_opens_require_capability_and_their_own_request_identity() {
             .env("SMAD_EXECUTABLE", "/must-not-execute")
             .args([
                 "open",
-                &format!("code://{}?highlight=48,2-3,4", file.display()),
+                &format!("{scheme}://{}?highlight=48,2-3,4", file.display()),
                 "--json",
             ])
             .output()
@@ -327,7 +342,14 @@ fn source_opens_require_capability_and_their_own_request_identity() {
             assert_eq!(value["error"]["code"], "OPEN_SUPERSEDED");
         } else {
             assert!(result.status.success(), "{value}");
-            assert_eq!(value["document"]["renderer"], "code");
+            assert_eq!(
+                value["document"]["renderer"],
+                if kind == DocumentKind::Markdown {
+                    "markdown"
+                } else {
+                    "code"
+                }
+            );
         }
         fs::remove_dir_all(dir).unwrap();
     }

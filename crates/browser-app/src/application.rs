@@ -2,6 +2,8 @@
 mod highlight;
 #[path = "markdown.rs"]
 mod markdown;
+#[path = "markdown_mapping.rs"]
+mod markdown_mapping;
 #[path = "memory.rs"]
 mod memory;
 #[path = "mermaid.rs"]
@@ -136,7 +138,11 @@ impl AppController {
 
         let window = gtk::ApplicationWindow::builder()
             .application(app)
-            .title("SMAD")
+            .title(if std::env::var_os("SMAD_MARKDOWN_MAPPING_POC").is_some() {
+                "SMAD — Markdown mapping POC (isolated)"
+            } else {
+                "SMAD"
+            })
             .default_width(1280)
             .default_height(800)
             .child(&root)
@@ -430,7 +436,12 @@ impl AppController {
                 project,
                 source_file,
                 fragment,
+                highlights,
             } => {
+                let highlights = match smad_protocol::normalize_ranges(highlights) {
+                    Ok(ranges) => ranges,
+                    Err(error) => return response(request_id, ResponseStatus::Error, &error, None),
+                };
                 let source = match smad_core::markdown::canonical_markdown(Path::new(&source_file))
                 {
                     Ok(path) => path.to_str().expect("validated path").to_owned(),
@@ -442,9 +453,20 @@ impl AppController {
                     canonical_source_file: source.clone(),
                     kind: DocumentKind::Markdown,
                 };
+                self.document_views.borrow_mut().remove(&key);
                 self.mutate_with_render(
                     |model| {
                         model.open_markdown(project, source, timestamp());
+                        let document = model
+                            .projects
+                            .iter_mut()
+                            .flat_map(|p| &mut p.documents)
+                            .find(|d| d.key == key)
+                            .expect("opened Markdown");
+                        document.highlights = highlights;
+                        document.open_request_id = Some(request_id.clone());
+                        document.lifecycle = DocumentLifecycle::Loading;
+                        document.load_error = None;
                         true
                     },
                     false,
@@ -1164,6 +1186,7 @@ impl AppController {
                                 project,
                                 source_file: path,
                                 fragment,
+                                highlights: Vec::new(),
                             },
                         ));
                         return if result.status == ResponseStatus::Ok {
@@ -1175,14 +1198,14 @@ impl AppController {
                 }
                 Err("document project is no longer open".into())
             });
-            return Rc::new(surface::DocumentView::Markdown(
-                markdown::MarkdownView::new(
-                    Path::new(&key.canonical_source_file),
-                    &identity,
-                    emit,
-                    navigate,
-                ),
-            ));
+            let view = markdown::MarkdownView::new(
+                Path::new(&key.canonical_source_file),
+                &identity,
+                emit,
+                navigate,
+            );
+            view.set_highlights(document.highlights.clone());
+            return Rc::new(surface::DocumentView::Markdown(view));
         }
         // Creating the default network session starts a WebKit child process.
         // Native-only documents must never initialize it merely for downloads.
@@ -1247,6 +1270,10 @@ impl AppController {
                 return;
             };
             match event {
+                webview::DocumentEvent::HighlightsChanged(ranges) => {
+                    document.highlights = ranges;
+                    document.open_request_id = None;
+                }
                 webview::DocumentEvent::HighlightsCleared => {
                     document.highlights.clear();
                     document.old_highlights.clear();
@@ -1457,7 +1484,10 @@ fn response(
 
 fn snapshot(model: &BrowserModel, presentation_count: u64) -> BrowserStateSnapshot {
     BrowserStateSnapshot {
-        capabilities: vec!["source_documents_v1".into()],
+        capabilities: vec![
+            "source_documents_v1".into(),
+            "markdown_source_ranges_v1".into(),
+        ],
         version: Some(env!("CARGO_PKG_VERSION").into()),
         projects: model
             .projects

@@ -1,5 +1,10 @@
 //! Bounded native GTK reader. No HTML conversion, embedded browser, or executable Markdown.
-use super::{highlight, mermaid, table, webview::DocumentEvent};
+use super::{
+    highlight,
+    markdown_mapping::{Lines, SourceMap},
+    mermaid, table,
+    webview::DocumentEvent,
+};
 use gtk::{gdk, gio, glib, prelude::*};
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use smad_core::markdown::{self, LinkTarget};
@@ -16,6 +21,15 @@ pub struct MarkdownView {
     revision: Cell<u64>,
     job: RefCell<Option<(merman::OperationControl, glib::SourceId)>>,
     attachments: RefCell<Vec<Embedded>>,
+    source_map: RefCell<SourceMap>,
+    poc_ranges: RefCell<Vec<smad_protocol::LineRange>>,
+    range_entry: gtk::Entry,
+    range_cursor: Cell<usize>,
+    range_jump_pending: Cell<bool>,
+    mapping_warning: RefCell<Option<String>>,
+    read_error: RefCell<Option<String>>,
+    poc_status: gtk::Label,
+    poc_source: gtk::TextView,
     root: gtk::Box,
     text: gtk::TextView,
     status: gtk::Label,
@@ -93,6 +107,20 @@ impl MarkdownView {
             revision: Cell::new(0),
             job: RefCell::new(None),
             attachments: RefCell::new(Vec::new()),
+            source_map: RefCell::new(SourceMap::default()),
+            poc_ranges: RefCell::new(
+                std::env::var("SMAD_MARKDOWN_MAPPING_LINES")
+                    .ok()
+                    .and_then(|s| smad_protocol::parse_ranges(&s).ok())
+                    .unwrap_or_default(),
+            ),
+            range_entry: gtk::Entry::new(),
+            range_cursor: Cell::new(0),
+            range_jump_pending: Cell::new(false),
+            mapping_warning: RefCell::new(None),
+            read_error: RefCell::new(None),
+            poc_status: gtk::Label::new(None),
+            poc_source: gtk::TextView::new(),
             root,
             text,
             status,
@@ -109,6 +137,76 @@ impl MarkdownView {
             emit,
             navigate,
         });
+        {
+            let controls = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+            let entry = view.range_entry.clone();
+            entry.set_placeholder_text(Some("12-24,48 · Enter applies; empty clears"));
+            entry.set_hexpand(true);
+            controls.append(&gtk::Label::new(Some("Source highlights")));
+            entry.set_text(&smad_protocol::format_ranges(&view.poc_ranges.borrow()));
+            controls.append(&entry);
+            for (label, backwards) in [("Previous", true), ("Next", false)] {
+                let button = gtk::Button::with_label(label);
+                let weak = Rc::downgrade(&view);
+                button.connect_clicked(move |_| {
+                    if let Some(view) = weak.upgrade() {
+                        let count = view.poc_ranges.borrow().len();
+                        if count > 0 {
+                            view.range_cursor.set(
+                                (view.range_cursor.get() + if backwards { count - 1 } else { 1 })
+                                    % count,
+                            );
+                            view.scroll_poc_highlight();
+                        }
+                    }
+                });
+                controls.append(&button);
+            }
+            let clear = gtk::Button::with_label("Clear");
+            let input = entry.clone();
+            clear.connect_clicked(move |_| {
+                input.set_text("");
+                input.emit_activate();
+            });
+            controls.append(&clear);
+            view.root.insert_child_after(&controls, Some(&toolbar));
+            view.poc_status.set_wrap(true);
+            view.root
+                .insert_child_after(&view.poc_status, Some(&controls));
+            if std::env::var_os("SMAD_MARKDOWN_MAPPING_POC").is_some() {
+                view.poc_source.set_editable(false);
+                view.poc_source.set_monospace(true);
+                let source_scroll = gtk::ScrolledWindow::builder()
+                    .height_request(220)
+                    .child(&view.poc_source)
+                    .build();
+                let source_expander = gtk::Expander::builder()
+                    .label("POC inspector: original source with line numbers")
+                    .child(&source_scroll)
+                    .build();
+                view.root
+                    .insert_child_after(&source_expander, Some(&view.poc_status));
+            }
+            let weak = Rc::downgrade(&view);
+            entry.connect_activate(move |entry| {
+                if let Some(view) = weak.upgrade() {
+                    let ranges = if entry.text().is_empty() {
+                        Ok(Vec::new())
+                    } else {
+                        smad_protocol::parse_ranges(&entry.text())
+                    };
+                    match ranges {
+                        Ok(ranges) => {
+                            view.set_highlights(ranges.clone());
+                            (view.emit)(DocumentEvent::HighlightsChanged(ranges));
+                            view.ready_status();
+                            view.emit_ready();
+                        }
+                        Err(error) => view.poc_status.set_text(&error),
+                    }
+                }
+            });
+        }
         let weak = Rc::downgrade(&view);
         reload.connect_clicked(move |_| {
             if let Some(view) = weak.upgrade() {
@@ -253,6 +351,11 @@ impl MarkdownView {
                 return;
             }
         };
+        if content.lines().count() > 20_000 {
+            self.failure("Markdown limit: 20,000 source lines");
+            return;
+        }
+        self.read_error.borrow_mut().take();
         if self.content.borrow().as_ref() == Some(&content) {
             self.ready_status();
             self.emit_ready();
@@ -362,9 +465,19 @@ impl MarkdownView {
             self.text.add_child_at_anchor(&item.widget, &item.anchor);
         }
         *self.attachments.borrow_mut() = rendered.attachments;
+        *self.source_map.borrow_mut() = rendered.source_map;
+        self.apply_poc_highlights();
         *self.anchors.borrow_mut() = rendered.anchors;
         *self.links.borrow_mut() = rendered.links;
         self.link_menu.set_popover(None::<&gtk::Popover>);
+        if std::env::var_os("SMAD_MARKDOWN_MAPPING_POC").is_some() {
+            let numbered: String = content
+                .lines()
+                .enumerate()
+                .map(|(i, line)| format!("{:4}  {line}\n", i + 1))
+                .collect();
+            self.poc_source.buffer().set_text(&numbered);
+        }
         *self.content.borrow_mut() = Some(content);
         *self.warnings.borrow_mut() = (rendered.diagram_errors > 0).then(|| {
             format!(
@@ -374,6 +487,7 @@ impl MarkdownView {
         });
         self.ready_status();
         let text = self.text.downgrade();
+        let weak = self.weak.clone();
         let pending = self.pending_heading.borrow_mut().take();
         let mark = pending
             .as_ref()
@@ -383,13 +497,27 @@ impl MarkdownView {
                 .set_value(previous.min((adjustment.upper() - adjustment.page_size()).max(0.0)));
             if let (Some(text), Some(mark)) = (text.upgrade(), mark) {
                 text.scroll_to_mark(&mark, 0.1, true, 0.0, 0.0);
+                if let Some(view) = weak.upgrade() {
+                    view.range_jump_pending.set(false);
+                }
+            } else if let Some(view) = weak.upgrade()
+                && view.range_jump_pending.replace(false)
+            {
+                view.scroll_poc_highlight();
             }
         });
         self.emit_ready();
     }
 
     fn emit_ready(&self) {
-        if let Some(warning) = self.warnings.borrow().clone() {
+        if let Some(error) = self.read_error.borrow().clone() {
+            (self.emit)(DocumentEvent::Failed(error));
+            return;
+        }
+        if self.content.borrow().is_none() || self.job.borrow().is_some() {
+            return;
+        }
+        if let Some(warning) = self.combined_warning() {
             (self.emit)(DocumentEvent::ReadyWithWarnings(self.title(), warning));
         } else {
             (self.emit)(DocumentEvent::Ready(self.title()));
@@ -397,7 +525,22 @@ impl MarkdownView {
     }
 
     fn ready_status(&self) {
-        if let Some(warning) = self.warnings.borrow().as_ref() {
+        if let Some(error) = self.read_error.borrow().as_ref() {
+            self.status.set_text(&format!(
+                "Could not update: {error} · last good content retained"
+            ));
+            return;
+        }
+        if self.content.borrow().is_none() && self.job.borrow().is_none() {
+            self.status.set_text("Loading native Markdown…");
+            return;
+        }
+        if self.job.borrow().is_some() {
+            self.status
+                .set_text("Rendering native diagrams… previous content retained");
+            return;
+        }
+        if let Some(warning) = self.combined_warning() {
             self.status
                 .set_text(&format!("Native Markdown · {warning}"));
             return;
@@ -416,10 +559,89 @@ impl MarkdownView {
     }
 
     fn failure(&self, error: &str) {
+        *self.read_error.borrow_mut() = Some(error.to_owned());
         self.status.set_text(&format!(
             "Could not update: {error} · last good content retained"
         ));
         (self.emit)(DocumentEvent::Failed(error.to_owned()));
+    }
+
+    pub fn set_highlights(&self, ranges: Vec<smad_protocol::LineRange>) {
+        self.range_entry
+            .set_text(&smad_protocol::format_ranges(&ranges));
+        *self.poc_ranges.borrow_mut() = ranges;
+        self.range_cursor.set(0);
+        self.range_jump_pending.set(true);
+        if self.content.borrow().is_some() {
+            self.apply_poc_highlights();
+            self.scroll_poc_highlight();
+            self.range_jump_pending.set(false);
+        }
+    }
+
+    fn combined_warning(&self) -> Option<String> {
+        let warnings: Vec<_> = self
+            .warnings
+            .borrow()
+            .iter()
+            .cloned()
+            .chain(self.mapping_warning.borrow().iter().cloned())
+            .collect();
+        (!warnings.is_empty()).then(|| warnings.join(" · "))
+    }
+
+    fn apply_poc_highlights(&self) {
+        let report = self
+            .source_map
+            .borrow()
+            .apply(&self.text.buffer(), &self.poc_ranges.borrow());
+        self.poc_status.set_text(
+            report
+                .as_deref()
+                .unwrap_or("Source lines, not visual rows · diagrams/images select whole widgets"),
+        );
+        *self.mapping_warning.borrow_mut() = report;
+    }
+
+    fn scroll_poc_highlight(&self) {
+        let map = self.source_map.borrow();
+        let ranges = self.poc_ranges.borrow();
+        let ranges = ranges.get(self.range_cursor.get()).into_iter();
+        let intersects = |lines: &std::ops::Range<usize>| {
+            ranges
+                .clone()
+                .any(|r| (r.start as usize) < lines.end && r.end as usize >= lines.start)
+        };
+        let text = map
+            .spans
+            .iter()
+            .filter(|s| intersects(&s.lines))
+            .map(|s| s.chars.start);
+        let attachments = self.attachments.borrow();
+        let widgets = map
+            .widgets
+            .iter()
+            .filter(|(s, _)| intersects(s))
+            .filter_map(|(_, widget)| {
+                attachments
+                    .iter()
+                    .find(|item| widget == &item.widget || widget.is_ancestor(&item.widget))
+                    .map(|item| {
+                        self.text
+                            .buffer()
+                            .iter_at_child_anchor(&item.anchor)
+                            .offset()
+                    })
+            });
+        if let Some(offset) = text.chain(widgets).min() {
+            self.text.scroll_to_iter(
+                &mut self.text.buffer().iter_at_offset(offset),
+                0.1,
+                true,
+                0.0,
+                0.2,
+            );
+        }
     }
 
     pub fn heading(&self, fragment: &str) {
@@ -486,6 +708,7 @@ struct Embedded {
 }
 
 struct Rendered {
+    source_map: SourceMap,
     attachments: Vec<Embedded>,
     diagram_errors: usize,
     buffer: gtk::TextBuffer,
@@ -510,10 +733,14 @@ fn render(
     diagrams: &mermaid::Diagrams,
     follow: Rc<dyn Fn(&str)>,
 ) -> Result<Rendered, String> {
+    if content.lines().count() > 20_000 {
+        return Err("Markdown limit: 20,000 source lines".into());
+    }
     let events: Vec<_> = Parser::new_ext(
         content,
         Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS,
     )
+    .into_offset_iter()
     .take(20_001)
     .collect();
     if events.len() > 20_000 {
@@ -596,10 +823,22 @@ fn render(
     let mut code: Option<(String, String)> = None;
     let mut attachments = Vec::new();
     let mut diagram_errors = 0;
-    for event in events {
+    let lines = Lines::new(content);
+    let mut source_map = SourceMap::default();
+    let mut code_parts = Vec::new();
+    let mut code_chars = 0;
+    let mut code_start = 0;
+    let mut image_start = 0;
+    let mut table_rows: Vec<std::ops::Range<usize>> = Vec::new();
+    for (event, bytes) in events {
+        let output_start = buffer.char_count();
         if let Some((_, text)) = code.as_mut() {
             match event {
-                Event::Text(part) => text.push_str(&part),
+                Event::Text(part) => {
+                    code_parts.push((bytes.clone(), part.to_string(), code_chars));
+                    code_chars += part.chars().count() as i32;
+                    text.push_str(&part);
+                }
                 Event::End(TagEnd::CodeBlock) => {
                     let (language, text) = code.take().expect("code block");
                     if language == "mermaid" {
@@ -609,12 +848,17 @@ fn render(
                             .and_then(|svg| svg.as_ref().map_err(Clone::clone))
                             .and_then(|svg| diagram_widget(svg, &text))
                         {
-                            Ok(widget) => embed(
-                                &buffer,
-                                &mut attachments,
-                                widget,
-                                format!("```mermaid\n{text}```\n"),
-                            ),
+                            Ok(widget) => {
+                                source_map
+                                    .widgets
+                                    .push((lines.range(code_start..bytes.end), widget.clone()));
+                                embed(
+                                    &buffer,
+                                    &mut attachments,
+                                    widget,
+                                    format!("```mermaid\n{text}```\n"),
+                                );
+                            }
                             Err(error) => {
                                 diagram_errors += 1;
                                 insert(
@@ -622,12 +866,33 @@ fn render(
                                     &format!("Diagram unavailable: {error}\n"),
                                     &["italic"],
                                 );
+                                let start = buffer.char_count();
                                 highlighted_code(&buffer, &text, "");
+                                for (range, text, offset) in &code_parts {
+                                    source_map.text(
+                                        &lines,
+                                        content,
+                                        range.clone(),
+                                        text,
+                                        start + offset,
+                                    );
+                                }
                             }
                         }
                     } else {
                         highlighted_code(&buffer, &text, &language);
+                        for (range, text, offset) in &code_parts {
+                            source_map.text(
+                                &lines,
+                                content,
+                                range.clone(),
+                                text,
+                                output_start + offset,
+                            );
+                        }
                     }
+                    code_parts.clear();
+                    code_chars = 0;
                     insert(&buffer, "\n", &[]);
                 }
                 _ => {}
@@ -641,14 +906,30 @@ fn render(
                     image_count += 1;
                     if image_count <= 32 {
                         if let Some(texture) = local_image(source, &destination) {
-                            buffer.insert_paintable(&mut buffer.end_iter(), &texture);
-                            insert(&buffer, &format!("\n{alt}\n"), &[]);
+                            let picture = gtk::Picture::for_paintable(&texture);
+                            picture.set_can_shrink(false);
+                            picture.set_alternative_text(Some(&alt));
+                            let container = gtk::Box::new(gtk::Orientation::Vertical, 4);
+                            container.append(&picture);
+                            let caption = gtk::Label::new(Some(&alt));
+                            caption.set_wrap(true);
+                            container.append(&caption);
+                            let widget: gtk::Widget = container.upcast();
+                            source_map
+                                .widgets
+                                .push((lines.range(image_start..bytes.end), widget.clone()));
+                            embed(&buffer, &mut attachments, widget, format!("\n{alt}\n"));
                         } else {
                             insert(&buffer, &format!("[Image unavailable: {alt}]"), &[]);
                         }
                     } else {
                         insert(&buffer, "[Image limit reached]", &[]);
                     }
+                    source_map.atomic(
+                        &lines,
+                        image_start..bytes.end,
+                        output_start..buffer.char_count(),
+                    );
                 }
                 Event::Text(text) | Event::Code(text) => alt.push_str(&text),
                 _ => {}
@@ -664,12 +945,35 @@ fn render(
                 }
                 // Negative ranges represent native table-cell links, exposed in the Links menu.
                 links.extend(table.links.into_iter().map(|uri| (-1, -1, uri)));
+                if let Some(grid) = widget.downcast_ref::<gtk::Grid>() {
+                    for (row, range) in table_rows.drain(..).enumerate() {
+                        for column in 0..12 {
+                            if let Some(cell) = grid.child_at(column, row as i32) {
+                                source_map.widgets.push((lines.range(range.clone()), cell));
+                            }
+                        }
+                    }
+                }
                 embed(&buffer, &mut attachments, widget, plain);
             } else {
+                if matches!(event, Event::Start(Tag::TableHead | Tag::TableRow)) {
+                    table_rows.push(bytes.clone());
+                }
                 table.push(event);
             }
             continue;
         }
+        let mapping_text = match &event {
+            Event::Text(text) | Event::Code(text) | Event::Html(text) | Event::InlineHtml(text) => {
+                Some(text.to_string())
+            }
+            _ => None,
+        };
+        let inline_code = matches!(event, Event::Code(_));
+        let atomic = matches!(
+            event,
+            Event::SoftBreak | Event::HardBreak | Event::Rule | Event::TaskListMarker(_)
+        );
         match event {
             Event::Start(tag) => match tag {
                 Tag::Paragraph => {}
@@ -695,6 +999,7 @@ fn render(
                         }
                         CodeBlockKind::Indented => String::new(),
                     };
+                    code_start = bytes.start;
                     code = Some((language, String::new()));
                 }
                 Tag::List(start) => {
@@ -715,12 +1020,20 @@ fn render(
                         "• ".into()
                     };
                     insert(&buffer, &marker, &tags);
+                    source_map.atomic(
+                        &lines,
+                        bytes.start..bytes.start + 1,
+                        output_start..buffer.char_count(),
+                    );
                 }
                 Tag::Link { dest_url, .. } => {
                     link_start = Some((buffer.char_count(), dest_url.to_string()));
                     tags.push("link");
                 }
-                Tag::Image { dest_url, .. } => image = Some((dest_url.to_string(), String::new())),
+                Tag::Image { dest_url, .. } => {
+                    image_start = bytes.start;
+                    image = Some((dest_url.to_string(), String::new()));
+                }
                 Tag::Table(alignments) => active_table = Some(table::Table::new(alignments)),
                 _ => {}
             },
@@ -791,8 +1104,18 @@ fn render(
             Event::Html(text) | Event::InlineHtml(text) => insert(&buffer, &text, &["code"]),
             _ => {}
         }
+        if let Some(text) = mapping_text {
+            if inline_code {
+                source_map.inline_code(&lines, content, bytes, &text, output_start);
+            } else {
+                source_map.text(&lines, content, bytes, &text, output_start);
+            }
+        } else if atomic {
+            source_map.atomic(&lines, bytes, output_start..buffer.char_count());
+        }
     }
     Ok(Rendered {
+        source_map,
         attachments,
         diagram_errors,
         buffer,
@@ -911,6 +1234,10 @@ fn local_image(source: &Path, destination: &str) -> Option<gdk::Texture> {
     let pixbuf = gtk::gdk_pixbuf::Pixbuf::from_file_at_scale(path, 720, 480, true).ok()?;
     Some(gdk::Texture::for_pixbuf(&pixbuf))
 }
+
+#[cfg(test)]
+#[path = "markdown_mapping_tests.rs"]
+mod mapping_tests;
 
 #[cfg(test)]
 mod tests {

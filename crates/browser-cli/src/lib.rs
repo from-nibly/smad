@@ -138,6 +138,7 @@ pub fn run_markdown_open(args: Vec<String>) -> Result<(), String> {
             project,
             source_file: source.to_str().expect("validated UTF-8 path").into(),
             fragment,
+            highlights: Vec::new(),
         }))
         .map_err(|e| e.to_string())?;
     if response.status != ResponseStatus::Ok {

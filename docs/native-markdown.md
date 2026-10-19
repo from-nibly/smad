@@ -32,6 +32,36 @@ HTTP(S)/mailto links use the system handler. Other schemes and local non-Markdow
 the reader are refused; open reviews explicitly with `smad-axi open lavish://...` instead.
 There is no Back/Forward history; use explicit return links or the document list.
 
+## Source-line highlights
+
+```zsh
+smad-axi open 'md://./plan.md?highlight=12-24,48'
+smad-axi open 'md://./plan.md?highlight=12-24#decisions'
+```
+
+Ranges are original 1-based inclusive **source lines**, not visual rows. Paragraphs,
+quotes and lists highlight only the rendered text from those lines, including decoded
+entities and normalized multiline inline code. Fenced/indented/list-nested code highlights
+exact code lines. Blank rendered code lines have no visible glyph/marker and produce an
+explicit warning rather than a false visual-success claim. Tables select
+individual rows. Any line of a Mermaid section or image selects its entire native widget.
+Failed diagrams retain exact source-code fallback highlighting.
+
+Use the Source highlights field (Enter applies), Previous/Next, or Clear. Ranges persist
+with the document and are rebuilt against the current file on live updates; they do not
+track text moved to other line numbers. Reopening without a highlight query clears them.
+Heading fragments retain scroll precedence when both a fragment and ranges are supplied.
+
+Invisible source syntax has no automatic neighbouring/block fallback: blank source lines,
+reference definitions, ordinary code fences, table delimiters and setext underlines may be
+unmapped. Unknown multiline transformations are not guessed. These cases produce a visible
+warning and AXI `ready_with_warnings` (first 16 unmapped coordinates reported). The renderer
+does not add new dialect features such as math or footnotes just to map their source.
+
+The additive protocol-v2 capability `markdown_source_ranges_v1` gates highlighted Markdown
+opens. AXI verifies request identity as well as readiness on supporting servers and rejects
+older servers for highlighted opens instead of claiming success.
+
 ## Background work and resource policy
 
 Merman runs on one shared background worker with an eight-job queue, cooperative cancellation,
@@ -48,7 +78,9 @@ whiteboards. The original Mermaid source remains copyable.
 
 Reader limits:
 
-- 1 MiB UTF-8 Markdown, 20,000 parser events, 16 list levels and 256 links.
+- 1 MiB UTF-8 Markdown, 20,000 source lines, 20,000 parser events, 16 list levels and 256 links.
+- Source ranges: 64 normalized ranges, 2,048 query bytes, coordinates through 1,000,000.
+  Mapping work is bounded by source/event limits; adjacent tag applications are coalesced.
 - Native tables: 1,000 rows, 12 columns, 4,096 total cells, 256 characters per cell.
 - Highlighting: up to 64 KiB per code block and 4,096 bytes per line; larger blocks use plain text.
 - Mermaid: eight diagrams per document, 32 KiB source and 2 MiB SVG per diagram; four-second

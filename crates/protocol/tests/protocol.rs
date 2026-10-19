@@ -19,6 +19,22 @@ fn open_request() -> RequestEnvelope {
 }
 
 #[test]
+fn legacy_markdown_commands_default_to_no_source_ranges() {
+    let mut command = serde_json::json!({
+        "type": "open_markdown",
+        "project": {"key": {"kind": "standalone", "label": "Standalone"}, "label": "Standalone", "raw_tab_name": null},
+        "source_file": "/tmp/readme.md", "fragment": "heading"
+    });
+    let decoded: Command = serde_json::from_value(command.clone()).unwrap();
+    assert!(matches!(decoded, Command::OpenMarkdown { highlights, .. } if highlights.is_empty()));
+    command["highlights"] = serde_json::json!([{"start": 2, "end": 4}]);
+    let decoded: Command = serde_json::from_value(command).unwrap();
+    assert!(
+        matches!(decoded, Command::OpenMarkdown { highlights, .. } if highlights == vec![LineRange { start: 2, end: 4 }])
+    );
+}
+
+#[test]
 fn request_round_trips_with_version_and_id() {
     let request = open_request();
     let frame = encode_frame(&request).unwrap();

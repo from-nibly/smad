@@ -20,6 +20,7 @@ smad-axi status
   No `diff://` scheme. See [source/comparison semantics and limits](docs/native-source.md).
 - **`md://`** — native GTK Markdown: syntax-highlighted code, native Mermaid SVG, rich aligned
   tables, selectable text, local images, relative document links, and debounced live disk updates.
+  Source-line ranges highlight precise paragraph/code text, table rows, or whole diagram/image widgets.
 - **`lavish://`** — unchanged upstream [Lavish](https://github.com/kunchenguid/lavish-axi) review
   sessions in retained WebKit views. Upstream owns serving, annotations, feedback, export,
   whiteboards and session lifecycle; use `lavish-axi` for those operations.
@@ -33,6 +34,7 @@ than hiding incomplete diagrams. See [native rendering and limits](docs/native-m
 ```zsh
 smad-axi                         # live state; never starts or raises the app
 smad-axi open md://./plan.md     # start/reuse server, open, verify Ready
+smad-axi open 'md://./plan.md?highlight=12-24,48' # original source lines
 smad-axi documents --full
 smad-axi status --json
 smad-axi schemes
@@ -48,7 +50,8 @@ Paths after `://` are **local paths**, not network authorities. Relative paths r
 invoking directory. Percent-encode literal `#` and `?` in filenames; Markdown supports a heading
 fragment. Code accepts UTF-8 regular files with an optional `highlight` query. Only
 `.md`/`.markdown` and `.html`/`.htm` files are accepted by their respective schemes.
-Markdown source-line highlight queries are not yet implemented and are rejected explicitly.
+Markdown also accepts `?highlight=12-24,48`; syntax-only or unmapped lines produce explicit
+warnings, never an approximate neighbouring highlight. See [mapping semantics](docs/native-markdown.md#source-line-highlights).
 
 Opening captures the invoking HerdR session/workspace/tab IDs or Zellij session/stable tab ID.
 Display labels never become identity. Opening the same file/renderer in one project reuses its document entry;

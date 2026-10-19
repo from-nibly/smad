@@ -18,7 +18,10 @@ Run `smad-axi` for live state or `smad-axi --help` for current commands. Neither
   remain visible; this is not a patch view. There is NO `diff://` scheme.
 - Comparison `--highlight 12-24,48` refers to NEW-side source lines; `--highlight-old 3-8`
   refers to OLD-side source lines. Never count unified display rows.
-- Markdown source-line overlays are not implemented; do not invent md:// highlight queries.
+- `md://./plan.md?highlight=12-24,48` highlights original source lines in rendered Markdown:
+  precise paragraph/code text, table rows, whole diagrams/images. Syntax-only/unmapped lines
+  report warnings, not guessed neighbours. Reopen without a query to clear; `#heading` wins
+  scroll precedence. Requires the server's `markdown_source_ranges_v1` capability.
 - `smad-axi open md://./README.md` opens native Markdown with highlighting, tables, Mermaid,
   local images and live disk updates. Relative Markdown links stay in the native reader.
 - `smad-axi open lavish://./review.html` opens an upstream Lavish review in the retained WebKit
