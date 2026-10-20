@@ -1,0 +1,22 @@
+# SMAD-authored C-family lexical overlay.
+{
+  "name": "HLSL",
+  "scope": "source.hlsl",
+  "file_extensions": [
+    "hlsl",
+    "hlsli",
+    "fx",
+    "fxh"
+  ],
+  "contexts": {
+    "main": [
+      {
+        "match": "\\b(?:cbuffer|tbuffer|register|packoffset|technique|technique11|pass|sampler|sampler2D|samplerCUBE|Texture2D|TextureCube|SamplerState|RWTexture2D|float2|float3|float4|float4x4|half2|half3|half4|uint2|uint3|uint4|SV_Position|SV_Target|SV_DispatchThreadID|groupshared|numthreads)\\b",
+        "scope": "storage.type.hlsl"
+      },
+      {
+        "include": "scope:source.c++"
+      }
+    ]
+  }
+}

@@ -1,0 +1,81 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "Prolog",
+  "file_extensions": [
+    "pro",
+    "prolog"
+  ],
+  "scope": "source.prolog",
+  "contexts": {
+    "main": [
+      {
+        "match": "%.*$",
+        "scope": "comment.line.prolog"
+      },
+      {
+        "match": "/\\*",
+        "push": [
+          {
+            "meta_scope": "comment.block.prolog"
+          },
+          {
+            "match": "\\*/",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.prolog"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.prolog"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.prolog"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.prolog"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?:\\b(?:is|mod|div|not|dynamic|multifile|discontiguous|module|use_module|initialization|op|forall)\\b)",
+        "scope": "keyword.control.prolog"
+      },
+      {
+        "match": "(?:\\b(?:true|false|fail)\\b)",
+        "scope": "constant.language.prolog"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.prolog"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.prolog"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.prolog"
+      }
+    ]
+  }
+}

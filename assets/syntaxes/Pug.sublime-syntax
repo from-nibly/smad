@@ -1,0 +1,28 @@
+# SMAD-authored basic lexical overlay; not a full embedded-language parser.
+{
+  "name": "Pug",
+  "file_extensions": [
+    "pug",
+    "jade"
+  ],
+  "scope": "text.pug",
+  "contexts": {
+    "main": [
+      {
+        "match": "^\\s*//.*$",
+        "scope": "comment.line.pug"
+      },
+      {
+        "match": "^\\s*[a-zA-Z][\\w-]*",
+        "scope": "entity.name.tag.pug"
+      },
+      {
+        "match": "[.#][\\w-]+",
+        "scope": "entity.other.attribute-name.pug"
+      },
+      {
+        "include": "scope:source.js"
+      }
+    ]
+  }
+}

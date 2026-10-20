@@ -108,12 +108,12 @@ fn contrasting_color(color: (u8, u8, u8), dark: bool) -> (u8, u8, u8) {
     if dark { (255, 255, 255) } else { (0, 0, 0) }
 }
 
-fn syntax(source: &SourceText, language: &str, dark: bool) -> Vec<Vec<Paint>> {
+fn syntax(source: &SourceText, path: &std::path::Path, dark: bool) -> Vec<Vec<Paint>> {
     let text = source.display_text();
     let mut lines = vec![Vec::new(); source.lines.len()];
     let mut start = 0;
     let mut colors = std::collections::HashMap::new();
-    for (style, text) in highlight::code_spans(&text, language, dark) {
+    for (style, text) in highlight::file_spans(&text, path, dark) {
         let end = start + text.chars().count() as i32;
         if let Some(style) = style {
             let original = (style.foreground.r, style.foreground.g, style.foreground.b);
@@ -210,13 +210,8 @@ fn prepare(job: &Job) -> Result<Rendered, String> {
             summary,
         )
     };
-    let language = job
-        .source
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .unwrap_or("");
-    let old_paints = syntax(&old, language, job.dark);
-    let new_paints = syntax(&new, language, job.dark);
+    let old_paints = syntax(&old, &job.source, job.dark);
+    let new_paints = syntax(&new, &job.source, job.dark);
     let mut warnings = Vec::new();
     if [&old, &new].iter().any(|source| {
         source.text.len() > 64 * 1024 || source.text.lines().any(|line| line.len() > 4096)

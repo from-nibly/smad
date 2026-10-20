@@ -1,0 +1,34 @@
+# SMAD-authored basic lexical overlay; not a full embedded-language parser.
+{
+  "name": "Handlebars",
+  "file_extensions": [
+    "hbs",
+    "handlebars",
+    "mustache"
+  ],
+  "scope": "text.html.handlebars",
+  "contexts": {
+    "main": [
+      {
+        "match": "\\{\\{\\{?",
+        "scope": "punctuation.section.embedded.begin",
+        "push": [
+          {
+            "meta_scope": "meta.embedded"
+          },
+          {
+            "match": "\\}?\\}\\}",
+            "scope": "punctuation.section.embedded.end",
+            "pop": true
+          },
+          {
+            "include": "scope:source.js"
+          }
+        ]
+      },
+      {
+        "include": "scope:text.html.basic"
+      }
+    ]
+  }
+}

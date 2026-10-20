@@ -1,0 +1,80 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "Haxe",
+  "file_extensions": [
+    "hx"
+  ],
+  "scope": "source.haxe",
+  "contexts": {
+    "main": [
+      {
+        "match": "//.*$",
+        "scope": "comment.line.haxe"
+      },
+      {
+        "match": "/\\*",
+        "push": [
+          {
+            "meta_scope": "comment.block.haxe"
+          },
+          {
+            "match": "\\*/",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.haxe"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.haxe"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.haxe"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.haxe"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?:\\b(?:package|import|using|class|interface|enum|abstract|typedef|extends|implements|public|private|static|inline|macro|override|final|var|function|new|return|if|else|switch|case|default|for|in|while|do|try|catch|throw|untyped|cast)\\b)",
+        "scope": "keyword.control.haxe"
+      },
+      {
+        "match": "(?:\\b(?:true|false|null|this|super)\\b)",
+        "scope": "constant.language.haxe"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.haxe"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.haxe"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.haxe"
+      }
+    ]
+  }
+}

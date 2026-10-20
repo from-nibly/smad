@@ -1,0 +1,81 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "ReasonML",
+  "file_extensions": [
+    "re",
+    "rei"
+  ],
+  "scope": "source.reason",
+  "contexts": {
+    "main": [
+      {
+        "match": "//.*$",
+        "scope": "comment.line.reason"
+      },
+      {
+        "match": "/\\*",
+        "push": [
+          {
+            "meta_scope": "comment.block.reason"
+          },
+          {
+            "match": "\\*/",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.reason"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.reason"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.reason"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.reason"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?:\\b(?:let|rec|module|open|include|type|and|mutable|exception|switch|if|else|for|in|while|try|catch|raise|fun|function|external)\\b)",
+        "scope": "keyword.control.reason"
+      },
+      {
+        "match": "(?:\\b(?:true|false|None|Some)\\b)",
+        "scope": "constant.language.reason"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.reason"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.reason"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.reason"
+      }
+    ]
+  }
+}

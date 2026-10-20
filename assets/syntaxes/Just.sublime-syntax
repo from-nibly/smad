@@ -1,0 +1,83 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "Just",
+  "file_extensions": [
+    "just",
+    "justfile",
+    ".justfile",
+    "Justfile"
+  ],
+  "scope": "source.just",
+  "contexts": {
+    "main": [
+      {
+        "match": "#.*$",
+        "scope": "comment.line.just"
+      },
+      {
+        "match": "/\\*",
+        "push": [
+          {
+            "meta_scope": "comment.block.just"
+          },
+          {
+            "match": "\\*/",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.just"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.just"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.just"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.just"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?:\\b(?:set|export|alias|import|mod|if|else|assert|error|env_var|env_var_or|os|arch|shell)\\b)",
+        "scope": "keyword.control.just"
+      },
+      {
+        "match": "(?:\\b(?:true|false)\\b)",
+        "scope": "constant.language.just"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.just"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.just"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.just"
+      }
+    ]
+  }
+}

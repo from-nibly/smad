@@ -1,0 +1,84 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "Raku",
+  "file_extensions": [
+    "raku",
+    "rakumod",
+    "rakutest",
+    "p6",
+    "pm6"
+  ],
+  "scope": "source.raku",
+  "contexts": {
+    "main": [
+      {
+        "match": "#.*$",
+        "scope": "comment.line.raku"
+      },
+      {
+        "match": "/\\*",
+        "push": [
+          {
+            "meta_scope": "comment.block.raku"
+          },
+          {
+            "match": "\\*/",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.raku"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.raku"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.raku"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.raku"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?:\\b(?:use|unit|module|class|role|grammar|method|sub|my|our|state|has|constant|multi|proto|token|rule|regex|say|print|return|if|else|elsif|unless|for|while|loop|given|when|default|with|without|start|await|gather|take|do|try|CATCH|LEAVE|die)\\b)",
+        "scope": "keyword.control.raku"
+      },
+      {
+        "match": "(?:\\b(?:True|False|Nil|Any|Int|Str|Num|Bool)\\b)",
+        "scope": "constant.language.raku"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.raku"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.raku"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.raku"
+      }
+    ]
+  }
+}

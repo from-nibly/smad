@@ -1,0 +1,32 @@
+# SMAD-authored basic lexical overlay; not a full embedded-language parser.
+{
+  "name": "MDX",
+  "file_extensions": [
+    "mdx"
+  ],
+  "scope": "text.html.mdx",
+  "contexts": {
+    "main": [
+      {
+        "match": "^(?:import|export)\\b",
+        "scope": "punctuation.section.embedded.begin",
+        "push": [
+          {
+            "meta_scope": "meta.embedded"
+          },
+          {
+            "match": "^(?=\\s*$)",
+            "scope": "punctuation.section.embedded.end",
+            "pop": true
+          },
+          {
+            "include": "scope:source.ts"
+          }
+        ]
+      },
+      {
+        "include": "scope:text.html.markdown"
+      }
+    ]
+  }
+}

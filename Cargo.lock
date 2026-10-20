@@ -18,15 +18,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
-name = "aho-corasick"
-version = "1.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -150,21 +141,6 @@ checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
 dependencies = [
  "serde",
 ]
-
-[[package]]
-name = "bit-set"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08807e080ed7f9d5433fa9b275196cfc35414f66a0c79d864dc51a0d825231a3"
-dependencies = [
- "bit-vec",
-]
-
-[[package]]
-name = "bit-vec"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7"
 
 [[package]]
 name = "bitflags"
@@ -740,17 +716,6 @@ checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
 dependencies = [
  "event-listener",
  "pin-project-lite",
-]
-
-[[package]]
-name = "fancy-regex"
-version = "0.16.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "998b056554fbe42e03ae0e152895cd1a7e1002aec800fdc6635d20270260c46f"
-dependencies = [
- "bit-set",
- "regex-automata",
- "regex-syntax",
 ]
 
 [[package]]
@@ -1700,6 +1665,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "linked-hash-map"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2106,6 +2077,28 @@ name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "onig"
+version = "6.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cc3cbf698f9438986c11a880c90a6d04b9de27575afd28bbf45b154b6c709e2"
+dependencies = [
+ "bitflags 2.13.0",
+ "libc",
+ "once_cell",
+ "onig_sys",
+]
+
+[[package]]
+name = "onig_sys"
+version = "69.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e68317604e77e53b85896388e1a803c1d21b74c899ec9e5e1112db90735edd7"
+dependencies = [
+ "cc",
+ "pkg-config",
+]
 
 [[package]]
 name = "openssl-probe"
@@ -2579,17 +2572,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "regex-automata"
-version = "0.4.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2"
-dependencies = [
- "aho-corasick",
- "memchr",
- "regex-syntax",
-]
-
-[[package]]
 name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2888,22 +2870,24 @@ dependencies = [
 
 [[package]]
 name = "smad"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "gtk4",
  "merman",
  "pulldown-cmark",
+ "serde_json",
  "smad-control",
  "smad-core",
  "smad-protocol",
  "syntect",
+ "two-face",
  "url",
  "webkit6",
 ]
 
 [[package]]
 name = "smad-cli"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2916,7 +2900,7 @@ dependencies = [
 
 [[package]]
 name = "smad-control"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "libc",
  "smad-protocol",
@@ -2925,7 +2909,7 @@ dependencies = [
 
 [[package]]
 name = "smad-core"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "imara-diff",
  "libc",
@@ -2940,7 +2924,7 @@ dependencies = [
 
 [[package]]
 name = "smad-protocol"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2950,7 +2934,7 @@ dependencies = [
 
 [[package]]
 name = "smad-zellij"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "zellij-tile",
 ]
@@ -3141,15 +3125,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "656b45c05d95a5704399aeef6bd0ddec7b2b3531b7c9e900abbf7c4d2190c925"
 dependencies = [
  "bincode",
- "fancy-regex",
  "flate2",
  "fnv",
  "once_cell",
+ "onig",
  "regex-syntax",
  "serde",
  "serde_derive",
  "thiserror 2.0.21",
  "walkdir",
+ "yaml-rust",
 ]
 
 [[package]]
@@ -3435,6 +3420,17 @@ checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
 dependencies = [
  "pin-project",
  "tracing",
+]
+
+[[package]]
+name = "two-face"
+version = "0.5.2+bat-0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "915be7adc2ff6f4338acbf71f3eda0a146f46003b992a1669c674308610efdac"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "syntect",
 ]
 
 [[package]]
@@ -3931,6 +3927,15 @@ name = "writeable"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
+
+[[package]]
+name = "yaml-rust"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56c1936c4cc7a1c9ab21a1ebb602eb942ba868cbd44a99cb7cdc5892335e1c85"
+dependencies = [
+ "linked-hash-map",
+]
 
 [[package]]
 name = "yoke"

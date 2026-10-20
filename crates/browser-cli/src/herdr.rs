@@ -59,8 +59,11 @@ pub fn run_herdr_sync(arguments: Vec<String>) -> Result<(), String> {
         return Ok(());
     }
 
+    // Retain the last observed identity across subscription reconnects too. Replayed
+    // focus must not undo a project the user selected directly in SMAD.
+    let mut focused = None;
     loop {
-        if let Err(error) = synchronize(&options, &browser_client()) {
+        if let Err(error) = synchronize(&options, &browser_client(), &mut focused) {
             eprintln!(
                 "smad-herdr-sync: waiting for HerdR session {:?}: {error}",
                 options.session_name
@@ -130,13 +133,17 @@ fn browser_client() -> SocketClient {
     SocketClient::new(default_socket_path())
 }
 
-fn synchronize(options: &SyncOptions, browser: &SocketClient) -> Result<(), String> {
+fn synchronize(
+    options: &SyncOptions,
+    browser: &SocketClient,
+    focused: &mut Option<(String, String)>,
+) -> Result<(), String> {
     // Subscribe first so a rename during the initial snapshot cannot be missed.
     let mut reader = subscribe(&options.socket_path)?;
     let snapshot = request_snapshot(&options.socket_path)?;
     let mut tabs = tab_map(&snapshot);
     synchronize_labels(browser, &options.session_name, &snapshot)?;
-    select_focused(browser, &options.session_name, &snapshot)?;
+    select_changed_focus(browser, &options.session_name, &snapshot, focused)?;
     loop {
         let event: HerdrEvent = read_json_line(&mut reader)?;
         match event.event.as_str() {
@@ -144,7 +151,7 @@ fn synchronize(options: &SyncOptions, browser: &SocketClient) -> Result<(), Stri
                 let snapshot = request_snapshot(&options.socket_path)?;
                 tabs = tab_map(&snapshot);
                 synchronize_labels(browser, &options.session_name, &snapshot)?;
-                select_focused(browser, &options.session_name, &snapshot)?;
+                select_changed_focus(browser, &options.session_name, &snapshot, focused)?;
             }
             "tab_created" => {
                 let snapshot = request_snapshot(&options.socket_path)?;
@@ -164,10 +171,22 @@ fn synchronize(options: &SyncOptions, browser: &SocketClient) -> Result<(), Stri
                         },
                     )?;
                     tabs.remove(tab_id);
+                    if focused
+                        .as_ref()
+                        .is_some_and(|(workspace, tab)| workspace == workspace_id && tab == tab_id)
+                    {
+                        *focused = None;
+                    }
                 }
             }
             "workspace_closed" => {
                 if let Some(workspace_id) = event.data.get("workspace_id").and_then(Value::as_str) {
+                    if focused
+                        .as_ref()
+                        .is_some_and(|(workspace, _)| workspace == workspace_id)
+                    {
+                        *focused = None;
+                    }
                     let closed = tabs
                         .values()
                         .filter(|tab| tab.workspace_id == workspace_id)
@@ -241,6 +260,23 @@ fn tab_map(snapshot: &HerdrSnapshot) -> HashMap<String, HerdrTab> {
         .cloned()
         .map(|tab| (tab.tab_id.clone(), tab))
         .collect()
+}
+
+fn select_changed_focus(
+    browser: &SocketClient,
+    session_name: &str,
+    snapshot: &HerdrSnapshot,
+    previous: &mut Option<(String, String)>,
+) -> Result<(), String> {
+    let focused = snapshot
+        .focused_workspace_id
+        .clone()
+        .zip(snapshot.focused_tab_id.clone());
+    if *previous != focused {
+        select_focused(browser, session_name, snapshot)?;
+        *previous = focused;
+    }
+    Ok(())
 }
 
 fn select_focused(

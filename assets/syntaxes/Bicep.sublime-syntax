@@ -1,0 +1,81 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "Bicep",
+  "file_extensions": [
+    "bicep",
+    "bicepparam"
+  ],
+  "scope": "source.bicep",
+  "contexts": {
+    "main": [
+      {
+        "match": "//.*$",
+        "scope": "comment.line.bicep"
+      },
+      {
+        "match": "/\\*",
+        "push": [
+          {
+            "meta_scope": "comment.block.bicep"
+          },
+          {
+            "match": "\\*/",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.bicep"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.bicep"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.bicep"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.bicep"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?:\\b(?:param|var|resource|module|output|targetScope|existing|for|in|if|import|as|using|type|metadata|extension)\\b)",
+        "scope": "keyword.control.bicep"
+      },
+      {
+        "match": "(?:\\b(?:true|false|null)\\b)",
+        "scope": "constant.language.bicep"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.bicep"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.bicep"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.bicep"
+      }
+    ]
+  }
+}

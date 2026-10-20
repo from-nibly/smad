@@ -95,7 +95,9 @@ working-tree path is an absent side. Git symlinks/submodules are not supported.
   Binary/control bytes and bare-CR line endings are rejected; LF/CRLF are supported.
 - At most 64 ranges per side, 2,048 bytes per range string, coordinates up to
   1,000,000. Actual file bounds are checked when rendering.
-- Source syntax uses filename-extension detection and existing Syntect grammars.
+- Source syntax uses full filenames, compound extensions and recognized first lines
+  with the expanded Syntect bundle. See [coverage, aliases and limitations](syntax-highlighting.md)
+  and the [complete syntax catalog](syntax-catalog.md).
   Unknown languages show plain text. Inputs over 64 KiB or with a line over 4,096
   bytes skip syntax work with a warning, but retain the whole accepted source.
 - Histogram diff work is bounded by a 16-million changed-region line-pair budget

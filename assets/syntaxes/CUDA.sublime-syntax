@@ -1,0 +1,20 @@
+# SMAD-authored C-family lexical overlay.
+{
+  "name": "CUDA",
+  "scope": "source.cuda",
+  "file_extensions": [
+    "cu",
+    "cuh"
+  ],
+  "contexts": {
+    "main": [
+      {
+        "match": "\\b(?:__global__|__device__|__host__|__shared__|__constant__|__managed__|__restrict__|__syncthreads|blockIdx|blockDim|threadIdx|gridDim)\\b",
+        "scope": "storage.type.cuda"
+      },
+      {
+        "include": "scope:source.c++"
+      }
+    ]
+  }
+}

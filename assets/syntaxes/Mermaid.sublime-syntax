@@ -1,0 +1,33 @@
+# SMAD-authored basic lexical overlay; not a full embedded-language parser.
+{
+  "name": "Mermaid",
+  "file_extensions": [
+    "mermaid",
+    "mmd"
+  ],
+  "scope": "source.mermaid",
+  "contexts": {
+    "main": [
+      {
+        "match": "%%.*$",
+        "scope": "comment.line.mermaid"
+      },
+      {
+        "match": "\\b(?:graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|stateDiagram-v2|erDiagram|gantt|pie|gitGraph|mindmap|timeline|subgraph|end|direction|participant|actor|Note|loop|alt|else|opt|par|and|critical|break|rect|activate|deactivate|autonumber|classDef|class|style|linkStyle|click|title|section|dateFormat|TD|TB|BT|LR|RL)\\b",
+        "scope": "keyword.control.mermaid"
+      },
+      {
+        "match": "[-=.]+[<>|ox]?|[<>|ox][-=.]+",
+        "scope": "keyword.operator.mermaid"
+      },
+      {
+        "match": "\"[^\"\\n]*\"",
+        "scope": "string.quoted.mermaid"
+      },
+      {
+        "match": "\\b\\d+(?:\\.\\d+)?\\b",
+        "scope": "constant.numeric.mermaid"
+      }
+    ]
+  }
+}

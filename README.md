@@ -25,6 +25,11 @@ smad-axi status
   sessions in retained WebKit views. Upstream owns serving, annotations, feedback, export,
   whiteboards and session lifecycle; use `lavish-axi` for those operations.
 
+Code, comparison and Markdown fences share an expanded, offline Syntect bundle:
+CUE, Nix, Terraform/HCL, TypeScript/TSX, PowerShell, Nushell and many more.
+See the [tested coverage and limitations](docs/syntax-highlighting.md) and
+[complete syntax catalog](docs/syntax-catalog.md).
+
 No HTML conversion, JavaScript runtime or WebKit fallback is used for native Markdown.
 Mermaid errors retain source and show diagnostics; AXI reports `ready_with_warnings` rather
 than hiding incomplete diagrams. See [native rendering and limits](docs/native-markdown.md).

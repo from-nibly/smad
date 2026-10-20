@@ -1,0 +1,81 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "ReScript",
+  "file_extensions": [
+    "res",
+    "resi"
+  ],
+  "scope": "source.rescript",
+  "contexts": {
+    "main": [
+      {
+        "match": "//.*$",
+        "scope": "comment.line.rescript"
+      },
+      {
+        "match": "/\\*",
+        "push": [
+          {
+            "meta_scope": "comment.block.rescript"
+          },
+          {
+            "match": "\\*/",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.rescript"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.rescript"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.rescript"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.rescript"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?:\\b(?:let|rec|module|open|include|type|and|mutable|exception|switch|if|else|for|in|while|try|catch|external)\\b)",
+        "scope": "keyword.control.rescript"
+      },
+      {
+        "match": "(?:\\b(?:true|false|None|Some)\\b)",
+        "scope": "constant.language.rescript"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.rescript"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.rescript"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.rescript"
+      }
+    ]
+  }
+}

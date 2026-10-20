@@ -1,0 +1,56 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "Visual Basic",
+  "file_extensions": [
+    "vb",
+    "vbs",
+    "bas",
+    "cls",
+    "vba"
+  ],
+  "scope": "source.vb",
+  "contexts": {
+    "main": [
+      {
+        "match": "'.*$|(?i:\\bREM\\b.*$)",
+        "scope": "comment.line.vb"
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.vb"
+          },
+          {
+            "match": "\"\"",
+            "scope": "constant.character.escape.vb"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?i:\\b(?:Option|Explicit|Imports|Namespace|End|Class|Module|Public|Private|Protected|Friend|Shared|Static|Sub|Function|Return|Dim|As|New|If|Then|Else|ElseIf|Select|Case|For|Each|In|Next|While|Do|Loop|Until|Try|Catch|Finally|Throw|Using|With|Get|Set|Property|Implements|Inherits|Interface|Structure|Enum|Const|ByVal|ByRef|Async|Await|Me|MyBase|Not|And|Or|AndAlso|OrElse|Is|IsNot|Of|Integer|String|Boolean|Double|Object|Variant|Let|Call)\\b)",
+        "scope": "keyword.control.vb"
+      },
+      {
+        "match": "(?i:\\b(?:True|False|Nothing)\\b)",
+        "scope": "constant.language.vb"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.vb"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.vb"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.vb"
+      }
+    ]
+  }
+}

@@ -27,6 +27,12 @@ for package in metadata["packages"]:
             candidates.extend(entry.rglob("*") if entry.is_dir() else [entry])
     if package.get("license_file"):
         candidates.append(source / package["license_file"])
+    if package["name"] == "onig_sys":
+        # The statically bundled C engine has a separate BSD notice from the Rust bindings.
+        engine_license = source / "oniguruma/COPYING"
+        if not engine_license.is_file():
+            raise SystemExit("Missing vendored Oniguruma attribution")
+        candidates.append(engine_license)
     attribution_root = source
     if not candidates:
         attribution_root = root / "licenses/cargo-overrides" / f'{package["name"]}-{package["version"]}'

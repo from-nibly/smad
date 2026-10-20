@@ -1,0 +1,81 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "Agda",
+  "file_extensions": [
+    "agda",
+    "lagda"
+  ],
+  "scope": "source.agda",
+  "contexts": {
+    "main": [
+      {
+        "match": "--.*$",
+        "scope": "comment.line.agda"
+      },
+      {
+        "match": "\\{-",
+        "push": [
+          {
+            "meta_scope": "comment.block.agda"
+          },
+          {
+            "match": "-\\}",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.agda"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.agda"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.agda"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.agda"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?:\\b(?:module|where|open|import|public|private|abstract|data|record|field|constructor|let|in|with|rewrite|postulate|primitive|mutual|instance|infix|infixl|infixr|forall)\\b)",
+        "scope": "keyword.control.agda"
+      },
+      {
+        "match": "(?:\\b(?:Set|Prop)\\b)",
+        "scope": "constant.language.agda"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.agda"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.agda"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.agda"
+      }
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Nushell",
+    "repository": "https://github.com/kurokirasama/nushell_sublime_syntax",
+    "revision": "8a1bb9205859d0c2f362c6c5a2b7ef1a7a87c387",
+    "upstream_path": "nushell.sublime-syntax",
+    "file": "Nushell.sublime-syntax",
+    "sha256": "2ba54ef98f6a4e0a51ba9de8a8bac7ce0446f72d1a4b4e8ed5f3c1d5b355e385",
+    "license_file": "licenses/syntaxes/Nushell/LICENSE"
+  },
+  {
+    "name": "Gleam",
+    "repository": "https://github.com/digitalcora/sublime-text-gleam",
+    "revision": "c864e9c94972506047a509ee00d108d001184703",
+    "upstream_path": "package/Gleam.sublime-syntax",
+    "file": "Gleam.sublime-syntax",
+    "sha256": "267270650101a6d99724a914f6ecca85fd51b368d5fedc018e6a88aadd583103",
+    "license_file": "licenses/syntaxes/Gleam/LICENSE"
+  },
+  {
+    "name": "Dhall",
+    "repository": "https://github.com/kukimik/dhall-sublime-syntax-highlighting",
+    "revision": "b6c55960b5b577dca8493df8dab50aba6917cf2b",
+    "upstream_path": "dhall.sublime-syntax",
+    "file": "Dhall.sublime-syntax",
+    "sha256": "021b7c5d021462b91462182410a5f1eb2ebb986c67c17b11ce8cbbf7afc5734f",
+    "license_file": "licenses/syntaxes/Dhall/LICENSE"
+  },
+  {
+    "name": "Meson",
+    "repository": "https://github.com/Monochrome-Sauce/sublime-meson",
+    "revision": "6351b0a0abb2b0112c4b810ea4970dc79004469b",
+    "upstream_path": "meson.sublime-syntax",
+    "file": "Meson.sublime-syntax",
+    "sha256": "d203a687b8f239b32fb9084f4b3f80bc17abb72afbf65014f942ae04ee4ced81",
+    "license_file": "licenses/syntaxes/Meson/LICENSE"
+  },
+  {
+    "name": "TLA+",
+    "repository": "https://github.com/Calvin-L/sublime-tlaplus",
+    "revision": "1355743e68ed1bd51489ca0fe3b8a39a6d13e9f3",
+    "upstream_path": "tlaplus.sublime-syntax",
+    "file": "TLA+.sublime-syntax",
+    "sha256": "a66bb938beecb0aa376f983b60de07850a253f609c9fed7d3f950e4665cdae59",
+    "license_file": "licenses/syntaxes/TLA+/LICENSE"
+  }
+]

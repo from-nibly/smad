@@ -243,7 +243,7 @@ with tempfile.TemporaryDirectory(prefix="lavish-markdown-test-") as temporary:
             # Rust creates a fresh thread per test even with --test-threads=1;
             # GTK must initialize on only one thread per process.
             logs = []
-            for test in ("application::markdown::mapping_tests::source_line_mapping_poc", "application::markdown::tests::native_reader_live_updates_selection_links_and_cleanup", "application::source_view::tests::whole_source_comparison_ranges_live_updates_and_cleanup"):
+            for test in ("application::selection_tests::project_click_is_committed_before_deferred_render", "application::markdown::mapping_tests::source_line_mapping_poc", "application::markdown::tests::native_reader_live_updates_selection_links_and_cleanup", "application::source_view::tests::whole_source_comparison_ranges_live_updates_and_cleanup"):
                 command = ["cargo", "test", "-p", "smad", "--bin", "smad", test, "--", "--exact", "--ignored", "--test-threads=1", "--nocapture"]
                 test_env = dict(env, SMAD_MARKDOWN_MAPPING_POC="1") if test.endswith("source_line_mapping_poc") else env
                 result = subprocess.run(command, cwd=ROOT, env=test_env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)

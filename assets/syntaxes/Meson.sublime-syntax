@@ -1,0 +1,458 @@
+%YAML 1.2
+---
+# https://mesonbuild.com/Syntax.html#grammar
+name: Meson
+scope: source.meson
+version: 2
+
+file_extensions:
+  - meson.build
+  - meson.options
+  - meson_options.txt
+
+variables:
+  IDENTIFIER: '[a-zA-Z_][a-zA-Z_0-9]*'
+  BUILTIN_FUNCTIONS: |-
+    (?x:
+      add_global_arguments
+    | add_global_link_arguments
+    | add_languages
+    | add_project_arguments
+    | add_project_dependencies
+    | add_project_link_arguments
+    | add_test_setup
+    | alias_target
+    | assert
+    | benchmark
+    | both_libraries
+    | build_target
+    | configuration_data
+    | configure_file
+    | custom_target
+    | debug
+    | declare_dependency
+    | default
+    | dependency
+    | disabler
+    | environment
+    | error
+    | executable
+    | files
+    | find_program
+    | generator
+    | get_option
+    | get_variable
+    | import
+    | include_directories
+    | install_data
+    | install_emptydir
+    | install_headers
+    | install_man
+    | install_subdir
+    | install_symlink
+    | is_disabler
+    | is_variable
+    | jar
+    | join_paths
+    | library
+    | message
+    | project
+    | range
+    | run_command
+    | run_target
+    | set_variable
+    | shared_library
+    | shared_module
+    | static_library
+    | structured_sources
+    | subdir
+    | subdir_done
+    | subproject
+    | summary
+    | test
+    | unset_variable
+    | vcs_tag
+    | warning
+    )
+  ELEMENTARY_TYPES: |-
+    (?x: any | array | bool | dict | int | str | void)
+  BUILTIN_OBJECTS: |-
+    (?x: build_machine | host_machine | meson | target_machine)
+  METHODS_MACHINE: |-
+    (?x: cpu | cpu_family | endian | kernel | subsystem | system)
+
+
+####################################[ MAIN ]####################################
+
+contexts:
+  main:
+    - meta_include_prototype: false
+    - match: ''
+      push: statements
+
+  prototype:
+    - match: \s*(?=\S) # skip preceeding whitespace
+    - match: ((\#).*)$ # handle comments everywhere by default
+      captures:
+        1: comment.line.meson
+        2: punctuation.definition.comment.meson
+    - match: \s*(?=\S) # skip incoming whitespace
+
+  statements:
+    - include: try_control-flow
+    - include: try_expression
+
+  try_operator:
+    - match: \b(and|in|not|or)\b
+      scope: keyword.operator.word.meson
+    - match: \+?=
+      scope: keyword.operator.assignment.meson
+    - match: ([=!><]=)|[><]
+      scope: keyword.operator.comparison.meson
+    - match: \+|\-|\*|\/|\%
+      scope: keyword.operator.arithmetic.meson
+    - match: '\?|\:'
+      scope: keyword.operator.ternary.meson
+
+  try_variable:
+    - match: \b{{ELEMENTARY_TYPES}}\b
+      scope: support.type.meson
+    - match: \b{{BUILTIN_OBJECTS}}\b
+      scope: variable.language.meson
+      push: pops1_after-expression
+    - match: \b(({{BUILTIN_FUNCTIONS}})|({{IDENTIFIER}}))\s*(\()
+      captures:
+        2: support.function.builtin.meson
+        3: variable.function.meson
+        4: punctuation.section.parens.begin.meson
+      push: pops1_inside-function-call
+    - match: \b(({{BUILTIN_FUNCTIONS}})|({{IDENTIFIER}}))\b
+      captures:
+        2: support.function.builtin.meson
+        3: variable.other.readwrite.meson
+      push: pops1_after-expression
+
+  try_expression:
+    - match: \.
+      scope: punctuation.accessor.dot.meson
+    - match: \(
+      scope: punctuation.section.parens.begin.meson
+      push:
+        - meta_scope: meta.parens.meson
+        - match: \)
+          scope: punctuation.section.parens.end.meson
+          pop: 1
+        - include: try_expression
+    - match: \)
+      scope: punctuation.section.parens.end.meson invalid.illegal.meson
+      
+    - include: try_operator
+    - include: try_literal
+    - include: try_variable
+
+  pops1_inside-function-call:
+    - meta_scope: meta.block.meson
+    - meta_content_scope: meta.sequence.meson meta.function-call.arguments.meson
+    - match: \)
+      scope: punctuation.section.parens.end.meson
+      set: pops1_after-expression
+    - match: '\:'
+      scope: invalid.illegal.meson
+    - match: \b({{IDENTIFIER}})\s*(\:)\s*([\,\:]*)
+      captures:
+        1: variable.parameter.meson
+        2: punctuation.separator.key-value keyword.operator.assignment.meson
+        3: invalid.illegal.meson
+    - include: try_expression
+    - match: \,
+      scope: punctuation.separator.sequence.meson
+
+  pops1_after-expression:
+    - match: \(
+      scope: punctuation.section.parens.begin.meson
+      set: pops1_inside-function-call
+    - match: \s*(?!\.)
+      pop: 1
+    - include: try_expression
+    - include: immediately-pop1
+
+
+################################[ CONTROL FLOW ]################################
+
+  try_control-flow:
+    - match: \bbreak\b
+      scope: keyword.control.flow.break.meson invalid.illegal.meson
+    - match: \bcontinue\b
+      scope: keyword.control.flow.continue.meson invalid.illegal.meson
+    - match: \belif\b
+      scope: keyword.control.conditional.elseif.meson invalid.illegal.meson
+    - match: \belse\b
+      scope: keyword.control.conditional.else.meson invalid.illegal.meson
+    - match: \bendforeach\b
+      scope: keyword.control.loop.end.meson invalid.illegal.meson
+    - match: \bendif\b
+      scope: keyword.control.conditional.end.meson invalid.illegal.meson
+    - match: \bforeach\b
+      scope: keyword.control.loop.for.meson
+      push: pops1_foreach-condition
+    - match: \bif\b
+      scope: keyword.control.conditional.if.meson
+      push: pops1_if-body
+
+  pops1_if-body:
+    - meta_scope: meta.block.meson
+    - match: \belif\b
+      scope: keyword.control.conditional.elseif.meson
+      set: pops1_if-body
+    - match: \belse\b
+      scope: keyword.control.conditional.else.meson
+      set: pops1_else-body
+    - match: \bendif\b
+      scope: keyword.control.conditional.end.meson
+      pop: 1
+    - include: statements
+
+  pops1_else-body:
+    - meta_scope: meta.block.meson
+    - match: \bendif\b
+      scope: keyword.control.conditional.end.meson
+      pop: 1
+    - include: statements
+
+  pops1_foreach-condition:
+    - meta_scope: meta.block.meson
+    - match: '\:'
+      scope: punctuation.separator.key-value keyword.operator.assignment.meson
+      set: pops1_foreach-finish-condition
+    - match: \,
+      scope: punctuation.separator.sequence.meson
+    - include: try_expression
+
+  pops1_foreach-finish-condition:
+    - include: try_expression
+    - match: $
+      set: pops1_foreach-body
+
+  pops1_foreach-body:
+    - match: \bendforeach\b
+      scope: keyword.control.loop.end.meson
+      pop: 1
+    - match: \bbreak\b
+      scope: keyword.control.flow.break.meson
+    - match: \bcontinue\b
+      scope: keyword.control.flow.continue.meson
+    - include: statements
+
+
+##################################[ LITERALS ]##################################
+
+  try_literal:
+    - include: try_binary-literal
+    - include: try_boolean-literal
+    - include: try_hex-literal
+    - include: try_octal-literal
+    - include: try_decimal-literal
+    
+    - include: try_array-literal
+    - include: try_dictionary-literal
+    - include: try_string-literal
+
+  try_binary-literal:
+    - match: \b0b[01]+
+      scope: meta.number.integer.binary.meson constant.numeric.value.meson
+      push: pops1_after-expression
+    - match: \b0b[^01\s]*
+      scope: meta.number.integer.binary.meson constant.numeric.value.meson invalid.illegal.meson
+  try_boolean-literal:
+    - match: \bfalse\b
+      scope: constant.language.boolean.false.meson
+      push: pops1_after-expression
+    - match: \btrue\b
+      scope: constant.language.boolean.true.meson
+  try_hex-literal:
+    - match: \b0x[a-fA-F0-9]+
+      scope: meta.number.integer.hexadecimal.meson constant.numeric.value.meson
+      push: pops1_after-expression
+    - match: \b0x[^a-fA-F0-9\s]*
+      scope: meta.number.integer.hexadecimal.meson constant.numeric.value.meson invalid.illegal.meson
+  try_octal-literal:
+    - match: \b0o[0-7]+
+      scope: meta.number.integer.octal.meson constant.numeric.value.meson
+      push: pops1_after-expression
+    - match: \b0o[^0-7\s]*
+      scope: meta.number.integer.octal.meson constant.numeric.value.meson invalid.illegal.meson
+  try_decimal-literal:
+    - match: \b(0([0-9]*)|[1-9][0-9]*)
+      captures:
+        1: meta.number.integer.decimal.meson constant.numeric.value.meson
+        2: invalid.illegal.meson
+      push: pops1_after-expression
+
+  try_array-literal:
+    - match: \]
+      scope: punctuation.section.brackets.end.meson invalid.illegal.meson
+    - match: \[
+      scope: punctuation.section.brackets.begin.meson
+      push: pops1_inside-array-literal
+  pops1_inside-array-literal:
+    - meta_scope: meta.block.meson meta.brackets.meson
+    - meta_content_scope: meta.sequence.meson
+    - match: \]
+      scope: punctuation.section.brackets.end.meson
+      set: pops1_after-expression
+    - include: try_expression
+    - match: \,
+      scope: punctuation.separator.sequence.meson
+
+
+  pops1_end-dictionary-literal:
+    - match: \}
+      scope: punctuation.section.mapping.end.meson
+      set: pops1_after-expression
+  pops1_separator-dictionary-literal:
+    - match: \,
+      scope: punctuation.separator.sequence.meson
+      set: pops1_inside-dictionary-literal
+
+  try_dictionary-literal:
+    - match: \}
+      scope: punctuation.section.braces.end.meson invalid.illegal.meson
+    - match: \{
+      scope: punctuation.section.mapping.begin.meson
+      push: pops1_inside-dictionary-literal
+
+  pops1_inside-dictionary-literal:
+    - meta_scope: meta.block.meson meta.mapping.meson
+    - include: pops1_end-dictionary-literal
+    - match: '\:'
+      scope: punctuation.separator.key-value
+      set: pops1_dictionary-value
+    - match: (?=\S)
+      set: pops1_inside-dictionary-key
+
+  pops1_dictionary-value:
+    - meta_include_prototype: false
+    - meta_content_scope: meta.mapping.meson
+    - include: pops1_end-dictionary-literal
+    - include: pops1_separator-dictionary-literal
+    - match: (?=\S)
+      set: pops1_inside-dictionary-value
+
+  pops1_inside-dictionary-value:
+    - meta_content_scope: meta.mapping.value.meson
+    - match: (?=\s*[,}])
+      set: pops1_after-dictionary-value
+    - include: try_expression
+
+  pops1_after-dictionary-value:
+    - meta_include_prototype: false
+    - meta_content_scope: meta.mapping.meson
+    - include: pops1_end-dictionary-literal
+    - include: pops1_separator-dictionary-literal
+
+  pops1_inside-dictionary-key:
+    - meta_scope: meta.mapping.key.meson
+    - match: (?=\s*[,:}])
+      set: pops1_inside-dictionary-literal
+    - include: try_expression
+
+  try_string-literal:
+    - match: f(?=')
+      scope: storage.type.string.meson
+      push:
+        - match: "'''"
+          scope: punctuation.definition.string.begin.meson
+          set: pops1_inside-fmt-string-multiline
+        - match: "'"
+          scope: punctuation.definition.string.begin.meson
+          set: pops1_inside-fmt-string-simple
+        - include: else-pop1
+    - match: "'''"
+      scope: punctuation.definition.string.begin.meson
+      push: pops1_inside-string-multiline
+    - match: "'"
+      scope: punctuation.definition.string.begin.meson
+      push: pops1_inside-string-simple
+
+  try_string-literal-character-escape:
+    - match: \\\\|\\'|\\a|\\b|\\f|\\n|\\r|\\t|\\v
+      scope: constant.character.escape.meson
+    - match: \\[0-7]{3}
+      scope: constant.character.escape.octal.meson
+    - match: \\x[0-9a-fA-F]{2}
+      scope: constant.character.escape.hex.meson
+    - match: \\u[0-9a-fA-F]{4}
+      scope: constant.character.escape.unicode.16bit.meson
+    - match: \\U[0-9a-fA-F]{8}
+      scope: constant.character.escape.unicode.32bit.meson
+    - match: \\N\{{{IDENTIFIER}}\}
+      scope: constant.character.escape.unicode.name.meson
+    - match: \\.
+      scope: constant.character.escape.meson invalid.illegal.meson
+
+  try_string-literal-interpolation:
+    - match: \@
+      scope: punctuation.section.interpolation.begin.meson
+      push:
+        - meta_content_scope: meta.interpolation.meson
+        - clear_scopes: 1   # should remove the "string.quoted" scope
+        - include: try_literal
+        - include: try_variable
+        - match: \@
+          scope: punctuation.section.interpolation.end.meson
+          pop: 1
+
+  pops1_inside-fmt-string-multiline:
+    - meta_include_prototype: false
+    - meta_scope: meta.string.meson string.quoted.triple.meson
+    - include: try_string-literal-character-escape
+    - include: try_string-literal-interpolation
+    - match: "'''"
+      scope: punctuation.definition.string.end.meson
+      set: pops1_after-expression
+
+  pops1_inside-string-multiline:
+    - meta_include_prototype: false
+    - meta_scope: meta.string.meson string.quoted.triple.meson
+    - include: try_string-literal-character-escape
+    - match: "'''"
+      scope: punctuation.definition.string.end.meson
+      set: pops1_after-expression
+
+  pops1_inside-fmt-string-simple:
+    - meta_include_prototype: false
+    - meta_scope: meta.string.meson string.quoted.single.meson
+    - match: \n
+      scope: invalid.illegal.meson
+      pop: 1
+    - include: try_string-literal-character-escape
+    - include: try_string-literal-interpolation
+    - match: "'"
+      scope: punctuation.definition.string.end.meson
+      set: pops1_after-expression
+
+  pops1_inside-string-simple:
+    - meta_include_prototype: false
+    - meta_scope: meta.string.meson string.quoted.single.meson
+    - match: \n
+      scope: invalid.illegal.meson
+      pop: 1
+    - include: try_string-literal-character-escape
+    - match: "'"
+      scope: punctuation.definition.string.end.meson
+      set: pops1_after-expression
+
+
+###################################[ HELPER ]###################################
+
+  else-pop1:
+    - match: (?=\S)
+      pop: 1
+
+  eol-pop1:
+    - match: $
+      pop: 1
+
+  immediately-pop1:
+    - match: ''
+      pop: 1

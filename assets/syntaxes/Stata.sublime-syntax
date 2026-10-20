@@ -1,0 +1,81 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "Stata",
+  "file_extensions": [
+    "do",
+    "ado"
+  ],
+  "scope": "source.stata",
+  "contexts": {
+    "main": [
+      {
+        "match": "//.*$|^\\s*\\*.*$",
+        "scope": "comment.line.stata"
+      },
+      {
+        "match": "/\\*",
+        "push": [
+          {
+            "meta_scope": "comment.block.stata"
+          },
+          {
+            "match": "\\*/",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.stata"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.stata"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.stata"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.stata"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?i:\\b(?:clear|set|use|save|import|export|generate|gen|replace|drop|keep|rename|describe|summarize|regress|logit|predict|tabulate|merge|append|sort|by|bysort|if|in|foreach|forvalues|while|local|global|display|quietly|capture|program|end|preserve|restore)\\b)",
+        "scope": "keyword.control.stata"
+      },
+      {
+        "match": "(?i:\\b(?:_n|_N)\\b)",
+        "scope": "constant.language.stata"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.stata"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.stata"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.stata"
+      }
+    ]
+  }
+}

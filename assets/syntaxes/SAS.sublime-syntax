@@ -1,0 +1,76 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "SAS",
+  "file_extensions": [
+    "sas"
+  ],
+  "scope": "source.sas",
+  "contexts": {
+    "main": [
+      {
+        "match": "/\\*",
+        "push": [
+          {
+            "meta_scope": "comment.block.sas"
+          },
+          {
+            "match": "\\*/",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.sas"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.sas"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.sas"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.sas"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?i:\\b(?:data|set|merge|proc|run|quit|input|output|datalines|cards|informat|format|label|length|retain|array|do|end|if|then|else|where|by|class|var|model|tables|select|from|group|order|having|create|table|macro|mend|let|put|include|local|global)\\b)",
+        "scope": "keyword.control.sas"
+      },
+      {
+        "match": "(?i:\\b(?:_NULL_|_N_|_ERROR_)\\b)",
+        "scope": "constant.language.sas"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.sas"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.sas"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.sas"
+      }
+    ]
+  }
+}

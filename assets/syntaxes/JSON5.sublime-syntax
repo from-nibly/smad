@@ -1,0 +1,77 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "JSON5",
+  "file_extensions": [
+    "json5",
+    "jsonc"
+  ],
+  "scope": "source.json5",
+  "contexts": {
+    "main": [
+      {
+        "match": "//.*$",
+        "scope": "comment.line.json5"
+      },
+      {
+        "match": "/\\*",
+        "push": [
+          {
+            "meta_scope": "comment.block.json5"
+          },
+          {
+            "match": "\\*/",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.json5"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.json5"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.json5"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.json5"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?:\\b(?:true|false|null|Infinity|NaN)\\b)",
+        "scope": "constant.language.json5"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.json5"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.json5"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.json5"
+      }
+    ]
+  }
+}

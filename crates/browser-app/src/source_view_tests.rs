@@ -339,10 +339,57 @@ fn whole_source_comparison_ranges_live_updates_and_cleanup() {
     wait(|| view.rendered.borrow().is_some());
     capture(&window, "source-comparison-dark.png");
     let weak = Rc::downgrade(&view);
-    window.destroy();
+    window.set_child(gtk::Widget::NONE);
     drop(view);
     pump(100);
     assert!(weak.upgrade().is_none());
+    for dark in [false, true] {
+        gtk::Settings::default()
+            .unwrap()
+            .set_gtk_application_prefer_dark_theme(dark);
+        for (name, contents) in [
+            (
+                "example.cue",
+                "package demo\n#Service: {port: int & >=1 & <=65535}\nservice: #Service & {port: 8080}\n",
+            ),
+            (
+                "default.nix",
+                "{ pkgs, ... }: {\n  home.packages = [ pkgs.git ];\n  enable = true;\n}\n",
+            ),
+            (
+                "main.tf",
+                "resource \"aws_instance\" \"demo\" {\n  count = 2\n  ami = var.ami\n}\n",
+            ),
+        ] {
+            let path = directory.join(name);
+            std::fs::write(&path, contents).unwrap();
+            let mut sample = model.projects[0].documents[0].clone();
+            sample.key.canonical_source_file = path.to_str().unwrap().into();
+            sample.highlights = vec![LineRange { start: 2, end: 3 }];
+            let view = SourceView::new(&sample, "syntax-validation", Rc::new(|_| {}));
+            window.set_child(Some(&view.widget()));
+            wait(|| view.rendered.borrow().is_some());
+            let rendered = view.rendered.borrow();
+            let rendered = rendered.as_ref().unwrap();
+            assert_eq!(rendered.text, contents);
+            assert!(
+                rendered
+                    .paints
+                    .iter()
+                    .map(|p| p.color)
+                    .collect::<std::collections::HashSet<_>>()
+                    .len()
+                    > 1,
+                "{name}"
+            );
+            capture(
+                &window,
+                &format!("syntax-{name}-{}.png", if dark { "dark" } else { "light" }),
+            );
+            window.set_child(gtk::Widget::NONE);
+        }
+    }
+    window.destroy();
     gtk::Settings::default()
         .unwrap()
         .set_gtk_application_prefer_dark_theme(false);

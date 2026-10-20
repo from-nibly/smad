@@ -1,0 +1,52 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "ABAP",
+  "file_extensions": [
+    "abap"
+  ],
+  "scope": "source.abap",
+  "contexts": {
+    "main": [
+      {
+        "match": "\".*$|^\\*.*$",
+        "scope": "comment.line.abap"
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.abap"
+          },
+          {
+            "match": "''",
+            "scope": "constant.character.escape.abap"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?i:\\b(?:REPORT|DATA|TYPES|CONSTANTS|FIELD\\-SYMBOLS|TABLES|PARAMETERS|SELECT\\-OPTIONS|CLASS|DEFINITION|IMPLEMENTATION|METHOD|ENDMETHOD|ENDCLASS|PUBLIC|PRIVATE|PROTECTED|SECTION|IF|ELSE|ELSEIF|ENDIF|CASE|WHEN|ENDCASE|DO|ENDDO|LOOP|AT|INTO|ENDLOOP|SELECT|FROM|WHERE|ENDSELECT|CALL|FUNCTION|WRITE|FORM|ENDFORM|MODULE|ENDMODULE|READ|TABLE|APPEND|MODIFY|DELETE|SORT|EXPORTING|IMPORTING|RETURNING|CHANGING|TYPE|LIKE|VALUE|NEW)\\b)",
+        "scope": "keyword.control.abap"
+      },
+      {
+        "match": "(?i:\\b(?:abap_true|abap_false|space|initial)\\b)",
+        "scope": "constant.language.abap"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.abap"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.abap"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.abap"
+      }
+    ]
+  }
+}

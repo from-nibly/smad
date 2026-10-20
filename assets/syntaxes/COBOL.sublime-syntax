@@ -1,0 +1,70 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "COBOL",
+  "file_extensions": [
+    "cob",
+    "cbl",
+    "cpy"
+  ],
+  "scope": "source.cobol",
+  "contexts": {
+    "main": [
+      {
+        "match": "\\*>.*$|^.{6}\\*.*$",
+        "scope": "comment.line.cobol"
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.cobol"
+          },
+          {
+            "match": "\"\"",
+            "scope": "constant.character.escape.cobol"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.cobol"
+          },
+          {
+            "match": "''",
+            "scope": "constant.character.escape.cobol"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?i:\\b(?:IDENTIFICATION|DIVISION|PROGRAM\\-ID|ENVIRONMENT|DATA|WORKING\\-STORAGE|SECTION|PROCEDURE|PIC|PICTURE|VALUE|MOVE|TO|DISPLAY|ACCEPT|PERFORM|UNTIL|VARYING|FROM|BY|IF|ELSE|END\\-IF|END\\-PERFORM|EVALUATE|WHEN|END\\-EVALUATE|CALL|USING|STOP|RUN|GOBACK|COMPUTE|ADD|SUBTRACT|MULTIPLY|DIVIDE|INTO|GIVING|REDEFINES|OCCURS|COPY|FUNCTION)\\b)",
+        "scope": "keyword.control.cobol"
+      },
+      {
+        "match": "(?i:\\b(?:TRUE|FALSE|ZERO|ZEROS|SPACE|SPACES|LOW\\-VALUES|HIGH\\-VALUES)\\b)",
+        "scope": "constant.language.cobol"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.cobol"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.cobol"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.cobol"
+      }
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "Smalltalk",
+  "file_extensions": [
+    "st",
+    "smalltalk"
+  ],
+  "scope": "source.smalltalk",
+  "contexts": {
+    "main": [
+      {
+        "match": "\"[^\"]*\"",
+        "scope": "comment.line.smalltalk"
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.smalltalk"
+          },
+          {
+            "match": "''",
+            "scope": "constant.character.escape.smalltalk"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?:\\b(?:self|super|thisContext)\\b)",
+        "scope": "keyword.control.smalltalk"
+      },
+      {
+        "match": "(?:\\b(?:true|false|nil)\\b)",
+        "scope": "constant.language.smalltalk"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.smalltalk"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.smalltalk"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.smalltalk"
+      }
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+# SMAD-authored basic lexical overlay; not a full embedded-language parser.
+{
+  "name": "Astro",
+  "file_extensions": [
+    "astro"
+  ],
+  "scope": "text.html.astro",
+  "contexts": {
+    "main": [
+      {
+        "match": "^---\\s*$",
+        "scope": "punctuation.section.embedded.begin",
+        "push": [
+          {
+            "meta_scope": "meta.embedded"
+          },
+          {
+            "match": "^---\\s*$",
+            "scope": "punctuation.section.embedded.end",
+            "pop": true
+          },
+          {
+            "include": "scope:source.ts"
+          }
+        ]
+      },
+      {
+        "match": "\\{",
+        "scope": "punctuation.section.embedded.begin",
+        "push": [
+          {
+            "meta_scope": "meta.embedded"
+          },
+          {
+            "match": "\\}",
+            "scope": "punctuation.section.embedded.end",
+            "pop": true
+          },
+          {
+            "include": "scope:source.ts"
+          }
+        ]
+      },
+      {
+        "include": "scope:text.html.basic"
+      }
+    ]
+  }
+}

@@ -8,8 +8,10 @@ intermediate, browser subprocess, JavaScript runtime, or WebKit fallback is used
 
 - Headings, paragraphs, emphasis, strong text, strikethrough, nested/ordered lists, quotes,
   task markers, rules, inline code and fenced/indented code.
-- Syntect syntax highlighting for bundled grammars. Unknown languages and unusually large
-  code blocks stay readable as plain code. TypeScript uses the JavaScript grammar as a fallback.
+- Expanded [Syntect syntax highlighting](syntax-highlighting.md), including CUE, Nix,
+  Terraform/HCL and dedicated TypeScript/TSX grammars. Unknown languages and unusually
+  large code blocks stay readable as plain code. The [catalog](syntax-catalog.md)
+  lists bundled definitions; coverage tests exercise both filenames and fence aliases.
 - Native GFM table grids: column alignment, wrapping, bold/italic/code cells, working links,
   selectable cell text and visible headers. Cross-block Copy serializes tables as tab-separated
   rows rather than dropping embedded content; cell selection has its normal native copy behavior.

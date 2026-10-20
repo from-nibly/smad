@@ -1,0 +1,49 @@
+# SMAD-authored basic lexical overlay; not a full embedded-language parser.
+{
+  "name": "Liquid",
+  "file_extensions": [
+    "liquid"
+  ],
+  "scope": "text.html.liquid",
+  "contexts": {
+    "main": [
+      {
+        "match": "\\{\\{",
+        "scope": "punctuation.section.embedded.begin",
+        "push": [
+          {
+            "meta_scope": "meta.embedded"
+          },
+          {
+            "match": "\\}\\}",
+            "scope": "punctuation.section.embedded.end",
+            "pop": true
+          },
+          {
+            "include": "scope:source.ruby"
+          }
+        ]
+      },
+      {
+        "match": "\\{%-?",
+        "scope": "punctuation.section.embedded.begin",
+        "push": [
+          {
+            "meta_scope": "meta.embedded"
+          },
+          {
+            "match": "-?%\\}",
+            "scope": "punctuation.section.embedded.end",
+            "pop": true
+          },
+          {
+            "include": "scope:source.ruby"
+          }
+        ]
+      },
+      {
+        "include": "scope:text.html.basic"
+      }
+    ]
+  }
+}

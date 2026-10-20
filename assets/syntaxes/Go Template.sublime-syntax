@@ -1,0 +1,38 @@
+# SMAD-authored basic lexical overlay; not a full embedded-language parser.
+{
+  "name": "Go Template",
+  "file_extensions": [
+    "gotmpl",
+    "gohtml",
+    "tpl"
+  ],
+  "scope": "text.html.gotemplate",
+  "contexts": {
+    "main": [
+      {
+        "match": "\\{\\{-?",
+        "scope": "punctuation.section.embedded.begin",
+        "push": [
+          {
+            "meta_scope": "meta.embedded"
+          },
+          {
+            "match": "-?\\}\\}",
+            "scope": "punctuation.section.embedded.end",
+            "pop": true
+          },
+          {
+            "match": "\\b(?:define|template|block|end|with|range|if|else|include|required|default|toYaml|indent|nindent)\\b",
+            "scope": "keyword.control.template"
+          },
+          {
+            "include": "scope:source.go"
+          }
+        ]
+      },
+      {
+        "include": "scope:text.html.basic"
+      }
+    ]
+  }
+}

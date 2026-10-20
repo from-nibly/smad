@@ -19,13 +19,20 @@ smad-herdr-sync --session main
 
 The helper connects to HerdR's user-owned Unix socket, reads the initial session snapshot, and subscribes to workspace/tab focus and closure events. It provides one-way synchronization:
 
-- visible known HerdR tab → silently select its existing browser project;
+- initial or changed visible HerdR tab identity → silently select its existing browser project;
 - renamed tab → update its existing browser project's label and tooltip, without selecting or raising it;
 - unknown tab → no-op (renames never create empty browser projects);
 - closed tab or workspace → close the corresponding browser project and retained views;
 - browser navigation → never change HerdR.
 
 Tab labels are refreshed on startup/reconnect and focus as well as rename events, so missed renames are recovered. Empty labels display the stable tab ID. Identity, document state, selection, and LRU timestamps are preserved; duplicate names remain distinct projects. Labels are one-way: changing a HerdR tab never changes its stable project key.
+
+Repeated focus notifications for the same session/workspace/tab do not reselect it.
+This lets you browse project tabs directly in SMAD without redundant focus events
+snapping you back. The last observed identity survives a subscription reconnect;
+a real terminal tab/workspace change still synchronizes normally. Closing the
+focused tab/workspace clears that remembered identity. `--once` remains an explicit
+way to reapply the current terminal selection.
 
 Focus and rename events do not start or raise SMAD. The helper reconnects after a HerdR server restart. Use `--socket PATH` for a nonstandard or test socket and `--once` to synchronize only the current snapshot.
 

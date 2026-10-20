@@ -1,0 +1,70 @@
+# SMAD-authored basic lexical syntax; see docs/syntax-highlighting.md.
+{
+  "name": "Forth",
+  "file_extensions": [
+    "forth",
+    "fth",
+    "4th"
+  ],
+  "scope": "source.forth",
+  "contexts": {
+    "main": [
+      {
+        "match": "\\\\[^\\n]*|\\([^)]*\\)",
+        "scope": "comment.line.forth"
+      },
+      {
+        "match": "\"",
+        "push": [
+          {
+            "meta_scope": "string.quoted.forth"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.forth"
+          },
+          {
+            "match": "\"",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "'",
+        "push": [
+          {
+            "meta_scope": "string.quoted.forth"
+          },
+          {
+            "match": "\\\\.",
+            "scope": "constant.character.escape.forth"
+          },
+          {
+            "match": "'",
+            "pop": true
+          }
+        ]
+      },
+      {
+        "match": "(?i:\\b(?::|;|variable|constant|value|create|does>|allot|cells|cell\\+|dup|drop|swap|over|rot|pick|roll|emit|type|cr|\\.|\\.s|if|else|then|begin|until|again|while|repeat|do|loop|\\+loop|leave|recurse|immediate|postpone|include|require)\\b)",
+        "scope": "keyword.control.forth"
+      },
+      {
+        "match": "(?i:\\b(?:true|false)\\b)",
+        "scope": "constant.language.forth"
+      },
+      {
+        "match": "\\b(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b",
+        "scope": "constant.numeric.forth"
+      },
+      {
+        "match": "[$@%][\\w]+",
+        "scope": "variable.other.forth"
+      },
+      {
+        "match": "[=<>!+*/|&:-]+",
+        "scope": "keyword.operator.forth"
+      }
+    ]
+  }
+}

@@ -37,6 +37,10 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+#[cfg(test)]
+#[path = "application_selection_tests.rs"]
+mod selection_tests;
+
 const APPLICATION_ID: &str = "works.from-nibly.Smad";
 
 pub fn run() -> glib::ExitCode {
@@ -281,15 +285,7 @@ impl AppController {
                 .get(index as usize)
                 .map(|project| project.key.clone());
             if let Some(key) = key {
-                // A dormant project requires a structural render. Defer it until GTK
-                // finishes emitting switch-page so we never destroy the active notebook.
-                let weak = Rc::downgrade(&controller);
-                glib::idle_add_local_once(move || {
-                    if let Some(controller) = weak.upgrade() {
-                        controller
-                            .mutate_selection(|model| model.select_project(&key, timestamp()));
-                    }
-                });
+                controller.mutate_selection(|model| model.select_project(&key, timestamp()));
             }
         });
     }
@@ -724,7 +720,19 @@ impl AppController {
     }
 
     fn mutate_selection(self: &Rc<Self>, action: impl FnOnce(&mut BrowserModel) -> bool) -> bool {
-        self.mutate_with_render(action, false)
+        // Commit intent during the GTK signal: a load/rename render can arrive
+        // before the idle callback. Only widget rebuilding must wait for GTK.
+        let changed = action(&mut self.model.borrow_mut());
+        if changed {
+            let weak = Rc::downgrade(self);
+            glib::idle_add_local_once(move || {
+                if let Some(controller) = weak.upgrade() {
+                    // Render current state, never replay a captured selection key.
+                    controller.persist_and_render(false);
+                }
+            });
+        }
+        changed
     }
 
     fn mutate_with_render(
@@ -737,21 +745,25 @@ impl AppController {
             action(&mut model)
         };
         if changed {
-            if let Err(error) = self.store.save(&self.model.borrow()) {
-                eprintln!("could not persist browser metadata: {error}");
-            }
-            let selection_requires_render = {
-                let model = self.model.borrow();
-                let views = self.document_views.borrow();
-                selection_requires_render(&model, |key| views.contains_key(key))
-            };
-            if structural || selection_requires_render {
-                self.render();
-            } else {
-                self.sync_selection_widgets();
-            }
+            self.persist_and_render(structural);
         }
         changed
+    }
+
+    fn persist_and_render(self: &Rc<Self>, structural: bool) {
+        if let Err(error) = self.store.save(&self.model.borrow()) {
+            eprintln!("could not persist browser metadata: {error}");
+        }
+        let selection_requires_render = {
+            let model = self.model.borrow();
+            let views = self.document_views.borrow();
+            selection_requires_render(&model, |key| views.contains_key(key))
+        };
+        if structural || selection_requires_render {
+            self.render();
+        } else {
+            self.sync_selection_widgets();
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1000,15 +1012,7 @@ impl AppController {
                 .and_then(|project| project.documents.get(row.index() as usize))
                 .map(|document| document.key.clone());
             if let Some(key) = source {
-                // Selecting a dormant document can rebuild this list, so wait until
-                // GTK finishes emitting row-selected before mutating the widget tree.
-                let weak = Rc::downgrade(&controller);
-                glib::idle_add_local_once(move || {
-                    if let Some(controller) = weak.upgrade() {
-                        controller
-                            .mutate_selection(|model| model.select_document(&key, timestamp()));
-                    }
-                });
+                controller.mutate_selection(|model| model.select_document(&key, timestamp()));
             }
         });
 
