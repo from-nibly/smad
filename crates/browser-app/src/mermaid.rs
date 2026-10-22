@@ -1,6 +1,6 @@
 //! One bounded background renderer shared by native documents; no browser or JS runtime.
 use merman::{OperationControl, RenderOutput, RenderRequest, Renderer, SvgRequest};
-use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, Event, Tag, TagEnd};
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, LazyLock, mpsc};
 use std::time::Duration;
@@ -96,7 +96,7 @@ pub fn prepare(
 pub fn sources(content: &str) -> Vec<String> {
     let mut sources = Vec::new();
     let mut current = None;
-    for event in Parser::new(content).take(20_001) {
+    for (event, _) in super::markdown_parser::events(content).take(20_001) {
         match event {
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(language)))
                 if language.split_whitespace().next() == Some("mermaid") =>
@@ -162,6 +162,15 @@ mod tests {
         let cancelled = OperationControl::new();
         cancelled.cancel();
         assert!(render_svg("flowchart LR\n A --> B", cancelled).is_err());
+    }
+    #[test]
+    fn metadata_does_not_prepare_embedded_mermaid_fences() {
+        assert_eq!(
+            sources(
+                "---\nexample: |\n  ```mermaid\n  flowchart LR\n   WRONG --> WRONG\n  ```\n---\n\n```mermaid\nflowchart LR\n A --> B\n```\n"
+            ),
+            vec!["flowchart LR\n A --> B\n"]
+        );
     }
     #[test]
     fn only_mermaid_fences_are_prepared() {

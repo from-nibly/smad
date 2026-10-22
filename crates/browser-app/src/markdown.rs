@@ -6,7 +6,7 @@ use super::{
     webview::DocumentEvent,
 };
 use gtk::{gdk, gio, glib, prelude::*};
-use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, Event, Tag, TagEnd};
 use smad_core::markdown::{self, LinkTarget};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -736,13 +736,9 @@ fn render(
     if content.lines().count() > 20_000 {
         return Err("Markdown limit: 20,000 source lines".into());
     }
-    let events: Vec<_> = Parser::new_ext(
-        content,
-        Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS,
-    )
-    .into_offset_iter()
-    .take(20_001)
-    .collect();
+    let events: Vec<_> = super::markdown_parser::events(content)
+        .take(20_001)
+        .collect();
     if events.len() > 20_000 {
         return Err("Markdown POC limit: 20,000 parser events".into());
     }
@@ -828,10 +824,23 @@ fn render(
     let mut code_parts = Vec::new();
     let mut code_chars = 0;
     let mut code_start = 0;
+    let mut metadata_start = None;
     let mut image_start = 0;
     let mut table_rows: Vec<std::ops::Range<usize>> = Vec::new();
     for (event, bytes) in events {
         let output_start = buffer.char_count();
+        if let Some(start) = metadata_start {
+            if matches!(event, Event::End(TagEnd::MetadataBlock(_))) {
+                let raw = &content[start..bytes.end];
+                let widget = metadata_widget(raw);
+                source_map
+                    .widgets
+                    .push((lines.range(start..bytes.end), widget.clone()));
+                embed(&buffer, &mut attachments, widget, raw.to_owned());
+                metadata_start = None;
+            }
+            continue;
+        }
         if let Some((_, text)) = code.as_mut() {
             match event {
                 Event::Text(part) => {
@@ -976,6 +985,7 @@ fn render(
         );
         match event {
             Event::Start(tag) => match tag {
+                Tag::MetadataBlock(_) => metadata_start = Some(bytes.start),
                 Tag::Paragraph => {}
                 Tag::Heading { level, .. } => {
                     heading_start = Some(buffer.char_count());
@@ -1185,6 +1195,30 @@ fn highlighted_code(buffer: &gtk::TextBuffer, source: &str, language: &str) {
             insert(buffer, text, &["codeblock"]);
         }
     }
+}
+
+fn metadata_widget(source: &str) -> gtk::Widget {
+    let buffer = gtk::TextBuffer::new(None::<&gtk::TextTagTable>);
+    buffer
+        .tag_table()
+        .add(&gtk::TextTag::builder().name("codeblock").build());
+    highlighted_code(&buffer, source, "yaml");
+    let text = gtk::TextView::with_buffer(&buffer);
+    text.set_editable(false);
+    text.set_cursor_visible(false);
+    text.set_monospace(true);
+    text.set_wrap_mode(gtk::WrapMode::WordChar);
+    // TextView child anchors otherwise allocate only the expander label's width.
+    text.set_size_request(600, -1);
+    text.set_left_margin(12);
+    text.set_right_margin(12);
+    text.set_top_margin(8);
+    text.set_bottom_margin(8);
+    gtk::Expander::builder()
+        .label("Document metadata · YAML")
+        .child(&text)
+        .build()
+        .upcast()
 }
 
 fn diagram_widget(svg: &str, source: &str) -> Result<gtk::Widget, String> {

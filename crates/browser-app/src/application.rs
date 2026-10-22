@@ -4,6 +4,8 @@ mod highlight;
 mod markdown;
 #[path = "markdown_mapping.rs"]
 mod markdown_mapping;
+#[path = "markdown_parser.rs"]
+mod markdown_parser;
 #[path = "memory.rs"]
 mod memory;
 #[path = "mermaid.rs"]

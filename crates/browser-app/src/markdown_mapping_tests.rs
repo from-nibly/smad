@@ -1,5 +1,156 @@
 use super::*;
 
+#[test]
+#[ignore = "requires private display; one GTK test per process"]
+fn yaml_frontmatter_is_collapsible_copyable_and_source_mapped() {
+    gtk::init().unwrap();
+    let fixture =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/markdown/frontmatter.md");
+    let original = std::fs::read_to_string(&fixture).unwrap();
+    let view = MarkdownView::new(
+        &fixture,
+        "frontmatter-test",
+        Rc::new(|_| {}),
+        Rc::new(|_, _| Ok(())),
+    );
+    for content in [original.clone(), original.replace('\n', "\r\n")] {
+        view.apply_content(content.clone(), Default::default());
+        let attachments = view.attachments.borrow();
+        assert_eq!(attachments.len(), 1);
+        let expander = attachments[0]
+            .widget
+            .downcast_ref::<gtk::Expander>()
+            .unwrap();
+        assert_eq!(
+            expander.label().as_deref(),
+            Some("Document metadata · YAML")
+        );
+        assert!(!expander.is_expanded());
+        let child = expander
+            .child()
+            .unwrap()
+            .downcast::<gtk::TextView>()
+            .unwrap();
+        let yaml = child.buffer();
+        let raw_end = content
+            .find(if content.contains("\r\n") {
+                "---\r\n\r\n"
+            } else {
+                "---\n\n"
+            })
+            .unwrap()
+            + 3;
+        assert_eq!(attachments[0].copy, content[..raw_end]);
+        assert_eq!(
+            yaml.text(&yaml.start_iter(), &yaml.end_iter(), false),
+            content[..raw_end]
+        );
+        assert!(yaml.tag_table().size() > 1, "YAML syntax highlighting");
+        assert!(!child.is_editable());
+        let buffer = view.text.buffer();
+        let body = buffer.text(&buffer.start_iter(), &buffer.end_iter(), false);
+        assert!(!body.contains("title:"));
+        assert!(body.contains("The document body starts here"));
+        assert!(body.contains("────────────────────────"));
+        let copied = view.selection_text(&buffer.start_iter(), &buffer.end_iter());
+        assert!(copied.starts_with(&content[..raw_end]));
+        assert!(copied.contains("The document body starts here"));
+        let rendered = render(&content, &fixture, &Default::default(), Rc::new(|_| {})).unwrap();
+        let line =
+            |needle: &str| content.lines().position(|s| s.contains(needle)).unwrap() as u32 + 1;
+        for number in [
+            1,
+            line("title:"),
+            line("Markdown *stays"),
+            line("Markdown *stays") + 1,
+        ] {
+            assert!(
+                rendered
+                    .source_map
+                    .apply(
+                        &rendered.buffer,
+                        &[smad_protocol::LineRange {
+                            start: number,
+                            end: number
+                        }]
+                    )
+                    .is_none()
+            );
+            let widget = &rendered.attachments[0].widget;
+            assert!(widget.has_css_class("source-poc-highlight"));
+            assert!(
+                widget
+                    .downcast_ref::<gtk::Expander>()
+                    .unwrap()
+                    .is_expanded()
+            );
+        }
+        let body_line = line("The document body");
+        assert!(
+            rendered
+                .source_map
+                .apply(
+                    &rendered.buffer,
+                    &[smad_protocol::LineRange {
+                        start: body_line,
+                        end: body_line
+                    }]
+                )
+                .is_none()
+        );
+        assert!(
+            !rendered.attachments[0]
+                .widget
+                .has_css_class("source-poc-highlight")
+        );
+        assert_eq!(
+            highlighted(&rendered.buffer).trim(),
+            "The document body starts here, below the collapsed metadata section."
+        );
+        drop(attachments);
+    }
+    let window = gtk::Window::builder()
+        .default_width(920)
+        .default_height(760)
+        .child(&view.root)
+        .build();
+    window.present();
+    if let Ok(path) = std::env::var("SMAD_MARKDOWN_SCREENSHOT") {
+        let directory = Path::new(&path).parent().unwrap();
+        for expanded in [false, true] {
+            view.attachments.borrow()[0]
+                .widget
+                .downcast_ref::<gtk::Expander>()
+                .unwrap()
+                .set_expanded(expanded);
+            let deadline = std::time::Instant::now() + Duration::from_millis(200);
+            while std::time::Instant::now() < deadline {
+                while glib::MainContext::default().pending() {
+                    glib::MainContext::default().iteration(false);
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            let snapshot = gtk::Snapshot::new();
+            let paintable = gtk::WidgetPaintable::new(Some(&window));
+            paintable.snapshot(&snapshot, window.width() as f64, window.height() as f64);
+            let node = snapshot.to_node().unwrap();
+            window
+                .renderer()
+                .unwrap()
+                .render_texture(&node, None)
+                .save_to_png(directory.join(if expanded {
+                    "frontmatter-expanded.png"
+                } else {
+                    "frontmatter-collapsed.png"
+                }))
+                .unwrap();
+        }
+    }
+    view.apply_content("# Reloaded without metadata\n".into(), Default::default());
+    window.close();
+    assert!(view.attachments.borrow().is_empty());
+}
+
 fn highlighted(buffer: &gtk::TextBuffer) -> String {
     let tag = buffer.tag_table().lookup("source-poc-highlight").unwrap();
     (0..buffer.char_count())

@@ -6,6 +6,9 @@ intermediate, browser subprocess, JavaScript runtime, or WebKit fallback is used
 
 ## Implemented
 
+- Leading YAML frontmatter appears as a collapsed, selectable, syntax-highlighted metadata
+  section rather than Markdown headings. Copying across it preserves the original YAML and
+  delimiters. Incomplete or nonleading blocks retain ordinary Markdown interpretation.
 - Headings, paragraphs, emphasis, strong text, strikethrough, nested/ordered lists, quotes,
   task markers, rules, inline code and fenced/indented code.
 - Expanded [Syntect syntax highlighting](syntax-highlighting.md), including CUE, Nix,
@@ -46,7 +49,8 @@ quotes and lists highlight only the rendered text from those lines, including de
 entities and normalized multiline inline code. Fenced/indented/list-nested code highlights
 exact code lines. Blank rendered code lines have no visible glyph/marker and produce an
 explicit warning rather than a false visual-success claim. Tables select
-individual rows. Any line of a Mermaid section or image selects its entire native widget.
+individual rows. Any line of a Mermaid section, image or YAML frontmatter selects its entire
+native widget. Highlighting frontmatter automatically expands the metadata section.
 Failed diagrams retain exact source-code fallback highlighting.
 
 Use the Source highlights field (Enter applies), Previous/Next, or Clear. Ranges persist

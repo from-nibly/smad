@@ -188,6 +188,9 @@ impl SourceMap {
                 .add_provider(&*css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
             if intersects(lines) {
                 widget.add_css_class("source-poc-highlight");
+                if let Some(expander) = widget.downcast_ref::<gtk::Expander>() {
+                    expander.set_expanded(true);
+                }
             } else {
                 widget.remove_css_class("source-poc-highlight");
             }

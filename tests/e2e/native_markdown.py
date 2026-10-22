@@ -157,6 +157,12 @@ def application_smoke(env, temporary):
             assert persisted_comparison()["before"] == pinned["before"], "moving HEAD and live reload must not change the fixed base"
             merged = json.loads(subprocess.check_output([axi, "compare", str(source), "--base", base, "--head", head, "--merge-base", "--json"], env=env, text=True))
             assert merged["comparison"]["mode"] == "merge_base" and merged["comparison"]["base_commit"] == base
+            metadata_fixture = ROOT / "tests/fixtures/markdown/frontmatter.md"
+            frontmatter = "md://" + str(metadata_fixture)
+            body_line = next(i for i, line in enumerate(metadata_fixture.read_text().splitlines(), 1) if line.startswith("The document body"))
+            for ranges in ("1-9", str(body_line)):
+                metadata_open = json.loads(subprocess.check_output([axi, "open", frontmatter + "?highlight=" + ranges, "--json"], env=env, text=True))
+                assert metadata_open["document"]["state"] == "ready", metadata_open
             # All native renderers must avoid creating a WebKit web process.
             processes = subprocess.check_output(["ps", "-eo", "pid=,ppid=,comm="], text=True)
             descendants = {app.pid}
@@ -243,7 +249,7 @@ with tempfile.TemporaryDirectory(prefix="lavish-markdown-test-") as temporary:
             # Rust creates a fresh thread per test even with --test-threads=1;
             # GTK must initialize on only one thread per process.
             logs = []
-            for test in ("application::selection_tests::project_click_is_committed_before_deferred_render", "application::markdown::mapping_tests::source_line_mapping_poc", "application::markdown::tests::native_reader_live_updates_selection_links_and_cleanup", "application::source_view::tests::whole_source_comparison_ranges_live_updates_and_cleanup"):
+            for test in ("application::markdown::mapping_tests::yaml_frontmatter_is_collapsible_copyable_and_source_mapped", "application::selection_tests::project_click_is_committed_before_deferred_render", "application::markdown::mapping_tests::source_line_mapping_poc", "application::markdown::tests::native_reader_live_updates_selection_links_and_cleanup", "application::source_view::tests::whole_source_comparison_ranges_live_updates_and_cleanup"):
                 command = ["cargo", "test", "-p", "smad", "--bin", "smad", test, "--", "--exact", "--ignored", "--test-threads=1", "--nocapture"]
                 test_env = dict(env, SMAD_MARKDOWN_MAPPING_POC="1") if test.endswith("source_line_mapping_poc") else env
                 result = subprocess.run(command, cwd=ROOT, env=test_env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
