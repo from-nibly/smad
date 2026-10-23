@@ -2870,7 +2870,7 @@ dependencies = [
 
 [[package]]
 name = "smad"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "gtk4",
  "merman",
@@ -2887,7 +2887,7 @@ dependencies = [
 
 [[package]]
 name = "smad-cli"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -2896,11 +2896,12 @@ dependencies = [
  "smad-protocol",
  "tempfile",
  "toon-format",
+ "url",
 ]
 
 [[package]]
 name = "smad-control"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "libc",
  "smad-protocol",
@@ -2909,7 +2910,7 @@ dependencies = [
 
 [[package]]
 name = "smad-core"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "imara-diff",
  "libc",
@@ -2924,7 +2925,7 @@ dependencies = [
 
 [[package]]
 name = "smad-protocol"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -2934,7 +2935,7 @@ dependencies = [
 
 [[package]]
 name = "smad-zellij"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "zellij-tile",
 ]

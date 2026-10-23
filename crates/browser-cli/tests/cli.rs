@@ -39,13 +39,13 @@ fn ack(request: &RequestEnvelope) -> ResponseEnvelope {
 }
 
 #[test]
-fn launcher_forwards_bytes_preserves_args_and_routes_standalone() {
+fn launcher_localizes_advertised_host_but_forwards_original_bytes_and_args() {
     let dir = temp_dir("opened");
     let socket = dir.join("control.sock");
     let args_log = dir.join("args");
     executable(
         &dir.join("npx"),
-        "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$ARGS_LOG\"\nprintf 'session:\\n  file: /tmp/review.html\\n  url: \"http://127.0.0.1:4387/session/abc\"\\n  status: opened\\nnext_step: \"poll\"\\n'\nprintf 'upstream warning\\n' >&2\n",
+        "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$ARGS_LOG\"\nprintf 'session:\\n  file: /tmp/review.html\\n  url: \"http://workstation.example.ts.net:4387/session/abc\"\\n  status: opened\\nnext_step: \"poll\"\\n'\nprintf 'upstream warning\\n' >&2\n",
     );
     let (tx, rx) = mpsc::channel();
     let server = SocketServer::bind(&socket, move |request| {
@@ -85,7 +85,7 @@ fn launcher_forwards_bytes_preserves_args_and_routes_standalone() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(output.stdout, b"session:\n  file: /tmp/review.html\n  url: \"http://127.0.0.1:4387/session/abc\"\n  status: opened\nnext_step: \"poll\"\n");
+    assert_eq!(output.stdout, b"session:\n  file: /tmp/review.html\n  url: \"http://workstation.example.ts.net:4387/session/abc\"\n  status: opened\nnext_step: \"poll\"\n");
     assert_eq!(output.stderr, b"upstream warning\n");
     assert_eq!(
         fs::read_to_string(args_log).unwrap(),
@@ -96,8 +96,9 @@ fn launcher_forwards_bytes_preserves_args_and_routes_standalone() {
         Command::OpenUrl {
             project,
             source_file,
-            ..
+            url,
         } => {
+            assert_eq!(url, "http://127.0.0.1:4387/session/abc");
             assert_eq!(
                 project.key,
                 ProjectKey::Standalone {

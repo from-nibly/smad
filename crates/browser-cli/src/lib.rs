@@ -8,7 +8,7 @@ use smad_control::{BrowserControl, ControlError, SocketClient, default_socket_pa
 use smad_core::labels::project_label;
 use smad_protocol::{
     Command, ProjectKey, ProjectMetadata, RequestEnvelope, ResponseEnvelope, ResponseStatus,
-    validate_session_url,
+    SessionUrlError, validate_session_url,
 };
 use std::ffi::OsString;
 use std::io::{self, Write};
@@ -189,14 +189,30 @@ pub fn parse_lavish_toon(output: &str) -> Result<LavishSession, String> {
             _ => {}
         }
     }
-    let session = LavishSession {
+    let mut session = LavishSession {
         file: file.ok_or_else(|| "upstream TOON did not include session.file".to_owned())?,
         url: url.ok_or_else(|| "upstream TOON did not include session.url".to_owned())?,
         status: status.ok_or_else(|| "upstream TOON did not include session.status".to_owned())?,
     };
-    validate_session_url(&session.url)
+    session.url = local_lavish_url(&session.url)
         .map_err(|error| format!("refusing upstream session URL {:?}: {error}", session.url))?;
     Ok(session)
+}
+
+fn local_lavish_url(value: &str) -> Result<String, SessionUrlError> {
+    match validate_session_url(value) {
+        Ok(_) => return Ok(value.to_owned()),
+        Err(SessionUrlError::NonLoopbackHost) => {}
+        Err(error) => return Err(error),
+    }
+    // The local Lavish CLI advertises a phone-ready Tailscale name, but its
+    // server also listens on loopback at the same port. Never resolve or
+    // connect to that advertised host. Raw control URLs remain loopback-only.
+    let mut url =
+        url::Url::parse(value).map_err(|error| SessionUrlError::Invalid(error.to_string()))?;
+    url.set_host(Some("127.0.0.1"))
+        .map_err(|_| SessionUrlError::NonLoopbackHost)?;
+    validate_session_url(url.as_str()).map(Into::into)
 }
 
 fn decode_toon_scalar(value: &str) -> Result<String, String> {

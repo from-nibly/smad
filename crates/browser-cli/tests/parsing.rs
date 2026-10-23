@@ -5,7 +5,7 @@ use smad_cli::{
 use smad_protocol::ProjectKey;
 
 #[test]
-fn parses_current_toon_and_rejects_malformed_or_remote_output() {
+fn parses_current_toon_and_preserves_loopback_output() {
     let text = "session:\n  file: \"/tmp/review file.html\"\n  url: \"http://[::1]:4387/session/key?noGate=1\"\n  status: opened\nnext_step: ignored\n";
     assert_eq!(
         parse_lavish_toon(text).unwrap(),
@@ -16,12 +16,52 @@ fn parses_current_toon_and_rejects_malformed_or_remote_output() {
         }
     );
     assert!(parse_lavish_toon("session:\n  file: /tmp/x\n").is_err());
-    assert!(
-        parse_lavish_toon(
-            "session:\n  file: /tmp/x\n  url: https://example.com/session/x\n  status: opened\n"
-        )
-        .is_err()
-    );
+}
+
+#[test]
+fn advertised_upstream_hosts_are_localized_without_dns_or_remote_access() {
+    for advertised in [
+        "http://workstation.example.ts.net:4387/session/key?noGate=1#review",
+        "http://192.0.2.12:4387/session/key?noGate=1#review",
+        "http://[2001:db8::1]:4387/session/key?noGate=1#review",
+        "http://must-not-resolve.invalid:4387/session/key?noGate=1#review",
+    ] {
+        let parsed = parse_lavish_toon(&format!(
+            "session:\n  file: /tmp/x\n  url: {advertised}\n  status: opened\n"
+        ))
+        .unwrap();
+        assert_eq!(
+            parsed.url,
+            "http://127.0.0.1:4387/session/key?noGate=1#review"
+        );
+        assert!(
+            smad_protocol::validate_session_url(advertised).is_err(),
+            "raw remote URLs must remain rejected"
+        );
+        assert!(smad_protocol::validate_session_url(&parsed.url).is_ok());
+    }
+}
+
+#[test]
+fn localizing_upstream_hosts_does_not_accept_unsafe_urls() {
+    for url in [
+        "https://user:secret@workstation.example.ts.net:4387/session/key",
+        "ftp://workstation.example.ts.net:4387/session/key",
+        "javascript:alert(1)",
+        "file:///session/key",
+        "http://workstation.example.ts.net:4387/not-session/key",
+        "http://workstation.example.ts.net:4387/session/",
+        "http://workstation.example.ts.net:4387/session//key",
+        "http://workstation.example.ts.net:bad/session/key",
+    ] {
+        assert!(
+            parse_lavish_toon(&format!(
+                "session:\n  file: /tmp/x\n  url: {url}\n  status: opened\n"
+            ))
+            .is_err(),
+            "{url}"
+        );
+    }
 }
 
 #[test]

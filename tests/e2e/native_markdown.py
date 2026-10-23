@@ -199,7 +199,27 @@ def application_smoke(env, temporary):
             try:
                 request(path, {"type": "open_url", "project": {"key": key, "label": "Renamed POC"}, "source_file": "/tmp/lavish-poc-review.html", "url": f"http://127.0.0.1:{server.server_port}/session/poc"})
                 wait_for(lambda: any(d["kind"] == "lavish_review" and d["lifecycle"] == "ready" for p in state()["projects"] for d in p["documents"]))
+                advertised = f"http://workstation.invalid:{server.server_port}/session/advertised?noGate=1"
+                try:
+                    request(path, {"type": "open_url", "project": {"key": key, "label": "Renamed POC"}, "source_file": "/tmp/rejected-remote.html", "url": advertised})
+                except RuntimeError as error:
+                    assert "loopback" in str(error), error
+                else:
+                    raise AssertionError("raw remote control URL was accepted")
+                artifact = Path(temporary) / "advertised-review.html"
+                artifact.write_text("<!doctype html><title>Advertised review</title>")
+                stub_dir = Path(temporary) / "upstream-stub"
+                stub_dir.mkdir()
+                stub = stub_dir / "npx"
+                toon = f"session:\n  file: {json.dumps(str(artifact))}\n  url: {advertised}\n  status: opened\n"
+                stub.write_text(f"#!{sys.executable}\nprint({toon!r})\n")
+                stub.chmod(0o700)
+                stub_env = dict(env, PATH=str(stub_dir) + os.pathsep + env.get("PATH", ""))
+                routed = json.loads(subprocess.check_output([axi, "open", "lavish://" + str(artifact), "--json"], env=stub_env, text=True))
+                assert routed["document"]["state"] == "ready", routed
                 final = state()
+                routed_document = next(d for p in final["projects"] for d in p["documents"] if d["source_file"] == str(artifact))
+                assert routed_document["url"] == f"http://127.0.0.1:{server.server_port}/session/advertised?noGate=1", routed_document
                 (EVIDENCE / "application-state.json").write_text(json.dumps(final, indent=2) + "\n")
                 (EVIDENCE / "memory.txt").write_text(f"Empty application: {baseline_rss}\nNative-only application: {rss}\nNo descendant WebKit process before opening review fixture.\n")
                 print(f"Application smoke passed: native dedup, HerdR no-raise rename/select, review Ready. Native-only {rss}")

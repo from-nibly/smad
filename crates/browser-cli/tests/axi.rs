@@ -55,13 +55,13 @@ fn absent_dashboard_and_unknown_flags_never_start_a_server() {
 }
 
 #[test]
-fn lavish_scheme_preserves_upstream_no_open_and_routes_review() {
+fn lavish_scheme_localizes_advertised_host_and_preserves_upstream_no_open() {
     use std::os::unix::fs::PermissionsExt;
     let dir = directory("lavish");
     let file = dir.join("review.html");
     fs::write(&file, "<h1>Review</h1>").unwrap();
     let toon = format!(
-        "session:\n  file: {}\n  url: http://127.0.0.1:4387/session/axi-test\n  status: opened",
+        "session:\n  file: {}\n  url: http://workstation.example.ts.net:4387/session/axi-test\n  status: opened",
         file.display()
     );
     let stub = dir.join("npx");
